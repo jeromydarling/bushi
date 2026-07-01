@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { registrationSchema, scoringEventSchema, signupSchema, slugify } from './index.js';
 
+const UUID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+
 describe('slugify', () => {
   it('produces url-safe slugs', () => {
     expect(slugify('Bushi Summer Open 2026!')).toBe('bushi-summer-open-2026');
@@ -19,7 +21,7 @@ describe('signup validation', () => {
 
 describe('registration validation', () => {
   it('demands the waiver be accepted', () => {
-    const base = { tournamentId: crypto.randomUUID(), athleteId: crypto.randomUUID(), divisionIds: [crypto.randomUUID()] };
+    const base = { tournamentId: UUID, athleteId: UUID, divisionIds: [UUID] };
     expect(registrationSchema.safeParse({ ...base, waiverAccepted: false }).success).toBe(false);
     expect(registrationSchema.safeParse({ ...base, waiverAccepted: true }).success).toBe(true);
   });
@@ -27,8 +29,8 @@ describe('registration validation', () => {
   it('requires at least one division', () => {
     expect(
       registrationSchema.safeParse({
-        tournamentId: crypto.randomUUID(),
-        athleteId: crypto.randomUUID(),
+        tournamentId: UUID,
+        athleteId: UUID,
         divisionIds: [],
         waiverAccepted: true,
       }).success,

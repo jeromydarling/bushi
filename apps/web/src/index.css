@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-ink-950 text-ink-100 font-sans antialiased;
+  }
+  html:not(.dark) body {
+    @apply bg-ink-50 text-ink-900;
+  }
+  ::selection {
+    @apply bg-kiai-500/30 text-white;
+  }
+}
+
+@layer components {
+  .container-bushi {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+  .hairline {
+    @apply border-ink-800/80;
+  }
+  html:not(.dark) .hairline {
+    @apply border-ink-200;
+  }
+  /* Subtle technical grid used behind hero / section art. */
+  .grid-lines {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+  html:not(.dark) .grid-lines {
+    background-image:
+      linear-gradient(to right, rgba(14, 16, 19, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(14, 16, 19, 0.05) 1px, transparent 1px);
+  }
+}
