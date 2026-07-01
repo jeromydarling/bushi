@@ -35,6 +35,20 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Preflight — verify Cloudflare credentials
+        run: |
+          fail=0
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+            echo "::error::Secret CLOUDFLARE_API_TOKEN is empty/unset. Add it at Settings → Secrets and variables → Actions → the 'Secrets' tab (NOT Variables), as a *Repository secret* named EXACTLY 'CLOUDFLARE_API_TOKEN' (no environment)."
+            fail=1
+          fi
+          if [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "::error::Secret CLOUDFLARE_ACCOUNT_ID is empty/unset. Add it the same way, named EXACTLY 'CLOUDFLARE_ACCOUNT_ID'."
+            fail=1
+          fi
+          if [ "$fail" = "1" ]; then exit 1; fi
+          echo "✅ Cloudflare credentials present (token length ${#CLOUDFLARE_API_TOKEN}, account id length ${#CLOUDFLARE_ACCOUNT_ID})."
+
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
