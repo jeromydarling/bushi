@@ -48,8 +48,22 @@ export const api = {
     request<{ tournament: unknown }>('/api/tournaments', { method: 'POST', body: JSON.stringify(body) }),
   discover: (params: string) => request<{ results: DiscoverItem[] }>(`/api/public/discover?${params}`),
   discoverWeb: (q: string) => request<{ results: DiscoverItem[]; found?: number }>(`/api/public/discover/web?q=${encodeURIComponent(q)}`),
+  discoveryRefresh: () =>
+    request<{ ok: boolean; found: number; inserted: number; updated: number }>('/api/admin/discovery/refresh', { method: 'POST' }),
+  discoveryRuns: () => request<{ runs: DiscoveryRun[] }>('/api/admin/discovery/runs'),
   plans: () => request<{ tiers: Array<{ tier: string; monthlyCents: number; annualCents: number }> }>('/api/billing/plans'),
 };
+
+export interface DiscoveryRun {
+  trigger: string;
+  query: string | null;
+  found: number;
+  inserted: number;
+  updated: number;
+  status: string;
+  error: string | null;
+  created_at: number;
+}
 
 /** Unified discovery item (Bushi-hosted or web-discovered). */
 export interface DiscoverItem {

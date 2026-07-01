@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge, Button, Card } from '../components/ui.js';
 import { Logo } from '../components/Logo.js';
 import { ThemeToggle } from '../components/ThemeToggle.js';
 import { schools, tournaments } from '../lib/demo.js';
+import { api, type DiscoveryRun } from '../lib/api.js';
 import { useSeo } from '../lib/seo.js';
 
 const flags = [
@@ -86,6 +87,8 @@ export function Admin() {
           </Card>
         </div>
 
+        <DiscoveryPanel />
+
         <Card className="p-0">
           <div className="border-b border-ink-800/80 px-5 py-3 text-sm font-semibold text-white not-dark:border-ink-200 not-dark:text-ink-900">Audit log</div>
           {audit.map((a, i) => (
@@ -102,5 +105,78 @@ export function Admin() {
         </div>
       </div>
     </div>
+  );
+}
+
+function DiscoveryPanel() {
+  const [runs, setRuns] = useState<DiscoveryRun[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  async function loadRuns() {
+    const res = await api.discoveryRuns();
+    if (res.ok) setRuns(res.data.runs);
+    else if (res.status === 401 || res.status === 403) setNote('Sign in as a platform admin to manage discovery.');
+    else if (res.status === 0) setNote('Connect the API (set VITE_API_BASE) to manage discovery.');
+  }
+
+  useEffect(() => {
+    void loadRuns();
+  }, []);
+
+  async function refresh() {
+    setBusy(true);
+    setNote(null);
+    const res = await api.discoveryRefresh();
+    setBusy(false);
+    if (res.ok) {
+      setNote(`Run complete — found ${res.data.found}, added ${res.data.inserted}, updated ${res.data.updated}.`);
+      void loadRuns();
+    } else {
+      setNote(res.status === 0 ? 'API not reachable.' : res.error);
+    }
+  }
+
+  return (
+    <Card className="p-0">
+      <div className="flex items-center justify-between border-b border-ink-800/80 px-5 py-3 not-dark:border-ink-200">
+        <span className="text-sm font-semibold text-white not-dark:text-ink-900">Tournament discovery (Perplexity)</span>
+        <Button size="sm" onClick={refresh} disabled={busy}>
+          {busy ? 'Running…' : 'Run discovery now'}
+        </Button>
+      </div>
+      {note && <div className="px-5 py-2 text-xs text-ink-400">{note}</div>}
+      {runs.length === 0 ? (
+        <div className="px-5 py-6 text-center text-sm text-ink-500">
+          No discovery runs yet. The nightly cron populates this, or run it now.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-sm">
+            <thead>
+              <tr className="border-b border-ink-800/60 text-left not-dark:border-ink-100">
+                {['When', 'Trigger', 'Found', 'Added', 'Updated', 'Status'].map((h) => (
+                  <th key={h} className="px-5 py-2 font-medium text-ink-500">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((r, i) => (
+                <tr key={i} className="border-b border-ink-800/40 last:border-0 not-dark:border-ink-100">
+                  <td className="px-5 py-2 text-ink-400">{new Date(r.created_at).toLocaleString()}</td>
+                  <td className="px-5 py-2 text-ink-300">{r.trigger}</td>
+                  <td className="px-5 py-2 text-ink-300">{r.found}</td>
+                  <td className="px-5 py-2 text-ink-300">{r.inserted}</td>
+                  <td className="px-5 py-2 text-ink-300">{r.updated}</td>
+                  <td className="px-5 py-2">
+                    <Badge tone={r.status === 'ok' ? 'success' : r.status === 'error' ? 'live' : 'neutral'}>{r.status}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }

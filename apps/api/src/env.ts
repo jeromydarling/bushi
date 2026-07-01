@@ -38,7 +38,12 @@ export interface Env {
   // Vars
   ENVIRONMENT: string;
   AI_GATEWAY_ID: string;
+  AI_GATEWAY_ACCOUNT_ID?: string;
   APP_BASE_URL: string;
+  // Discovery tuning (all optional; sensible defaults in code).
+  DISCOVERY_REGIONS?: string;
+  DISCOVERY_STYLES?: string;
+  DISCOVERY_HORIZON_MONTHS?: string;
 
   // Secrets
   SESSION_SECRET?: string;

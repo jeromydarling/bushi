@@ -1,9 +1,11 @@
 import { PerplexityClient, PerplexityNotConfigured } from '@bushi/ai';
 import {
+  MARTIAL_ARTS_STYLES,
   STYLE_LABELS,
   dedupeKey,
   discoveryResponseSchema,
   type DiscoveredTournamentInput,
+  type MartialArtStyle,
 } from '@bushi/domain';
 import { Db, now } from '@bushi/db';
 import type { Env } from '../env.js';
@@ -45,19 +47,41 @@ const SYSTEM =
   'Use the exact style keys: karate, taekwondo, bjj, judo, kickboxing, mma_amateur, open_mixed. Do not invent events.';
 
 export function makeClient(env: Env): PerplexityClient {
-  const gatewayBaseUrl = env.AI_GATEWAY_ID
-    ? `https://gateway.ai.cloudflare.com/v1/${env.AI_GATEWAY_ID}/perplexity`
-    : undefined;
+  // Route through an AI Gateway when both the account id and gateway name are
+  // configured (caching / analytics / rate limiting); else call Perplexity direct.
+  const acct = env.AI_GATEWAY_ACCOUNT_ID?.trim();
+  const gw = env.AI_GATEWAY_ID?.trim();
+  const gatewayBaseUrl =
+    acct && gw ? `https://gateway.ai.cloudflare.com/v1/${acct}/${gw}/perplexity` : undefined;
   return new PerplexityClient({ apiKey: env.PERPLEXITY_API_KEY, model: 'sonar', gatewayBaseUrl });
 }
 
-/** The batched queries the nightly cron runs (kept small for cost control). */
-export function defaultQueries(): string[] {
-  const styles = Object.values(STYLE_LABELS);
-  return [
-    ...styles.map((s) => `Upcoming ${s} tournaments and competitions in the United States in the next 3 months, with dates, city, and official links.`),
-    'Major upcoming Brazilian Jiu-Jitsu and grappling tournaments worldwide in the next 2 months with registration links.',
-  ];
+/**
+ * The batched queries the nightly cron runs. Configurable via vars for cost /
+ * coverage tuning:
+ *   DISCOVERY_REGIONS        comma list, e.g. "United States,Canada" (default "United States")
+ *   DISCOVERY_STYLES         comma list of style keys (default: all styles)
+ *   DISCOVERY_HORIZON_MONTHS lookahead window (default 3)
+ * One query per region (covering all selected styles) keeps the call count low.
+ * Hard-capped at 16 queries as a cost backstop.
+ */
+export function defaultQueries(env: Env): string[] {
+  const regions = splitCsv(env.DISCOVERY_REGIONS) ?? ['United States'];
+  const months = Number(env.DISCOVERY_HORIZON_MONTHS ?? '3') || 3;
+  const styleKeys = (splitCsv(env.DISCOVERY_STYLES) ?? [...MARTIAL_ARTS_STYLES]) as MartialArtStyle[];
+  const stylesText = styleKeys.map((k) => STYLE_LABELS[k] ?? k).join(', ');
+  return regions
+    .map(
+      (r) =>
+        `Upcoming ${stylesText} tournaments and competitions in ${r} in the next ${months} months, with exact dates, city, country, styles, organizer, and official registration links.`,
+    )
+    .slice(0, 16);
+}
+
+function splitCsv(v: string | undefined): string[] | undefined {
+  if (!v) return undefined;
+  const parts = v.split(',').map((s) => s.trim()).filter(Boolean);
+  return parts.length ? parts : undefined;
 }
 
 export interface IngestResult {
@@ -131,7 +155,7 @@ export async function ingestQuery(
 /** Run the full nightly batch. */
 export async function ingestAll(env: Env): Promise<IngestResult> {
   const totals: IngestResult = { found: 0, inserted: 0, updated: 0 };
-  for (const q of defaultQueries()) {
+  for (const q of defaultQueries(env)) {
     const r = await ingestQuery(env, q, 'cron');
     totals.found += r.found;
     totals.inserted += r.inserted;

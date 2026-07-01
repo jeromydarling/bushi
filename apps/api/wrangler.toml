@@ -100,8 +100,19 @@ crons = ["0 7 * * *"]
 
 [vars]
 ENVIRONMENT = "development"
-AI_GATEWAY_ID = ""
 APP_BASE_URL = "http://localhost:5173"
+
+# AI Gateway (optional) — set BOTH to route Perplexity through a gateway for
+# caching + a usage dashboard. Create one at Dashboard → AI → AI Gateway.
+#   AI_GATEWAY_ACCOUNT_ID = "<your account id>"
+#   AI_GATEWAY_ID         = "<gateway name/slug, e.g. bushi>"
+AI_GATEWAY_ID = ""
+AI_GATEWAY_ACCOUNT_ID = ""
+
+# Discovery tuning (edit freely; the cron cadence itself is [triggers].crons above).
+DISCOVERY_REGIONS = "United States"
+DISCOVERY_STYLES = ""            # empty = all styles
+DISCOVERY_HORIZON_MONTHS = "3"
 
 # ---------------------------------------------------------------------------
 # Secrets (set via `wrangler secret put <NAME>`; never commit real values):
