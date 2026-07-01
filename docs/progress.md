@@ -4,6 +4,21 @@ A running log of milestones, decisions, and next actions. Newest first.
 
 ---
 
+## 2026-07-01 — Cloudflare provisioning (via MCP)
+
+- Validated the account and binding config against Cloudflare docs through the
+  Cloudflare MCP. Caught and fixed a deploy-blocker: the Durable Object migration
+  used `new_classes` (paid-plan KV backend); switched to `new_sqlite_classes`.
+- Provisioned real resources and wired their IDs into `apps/api/wrangler.toml`:
+  D1 `bushi-db` (`79484850-…`), KV `bushi-cache` + `bushi-feature-flags`, R2
+  `bushi-assets` + `bushi-generated`. Renamed the Worker to `bushi` (the existing
+  Worker in the account).
+- Applied all 6 migrations to the live D1 (57 tables) and loaded a representative
+  seed (6 schools, 33 athletes, 2 tournaments, completed matches, sponsors,
+  rankings, prompt templates) directly via MCP, since the wrangler CLI is not
+  authenticated in this environment. The repo's `seed.sql` still generates the
+  full 66-athlete dataset for `db:seed:remote`.
+
 ## 2026-07-01 — Initial autonomous build
 
 ### Milestones

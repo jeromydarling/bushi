@@ -1,5 +1,5 @@
 #:schema node_modules/wrangler/config-schema.json
-name = "bushi-api"
+name = "bushi"
 main = "src/index.ts"
 compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
@@ -15,7 +15,7 @@ migrations_dir = "../../packages/db/migrations"
 [[d1_databases]]
 binding = "DB"
 database_name = "bushi-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "79484850-e353-4008-a7ca-be44d8a08163"
 
 # ---------------------------------------------------------------------------
 # Durable Objects — live mat rooms (WebSocket scoring state).
@@ -35,11 +35,11 @@ new_sqlite_classes = ["MatRoom"]
 # ---------------------------------------------------------------------------
 [[kv_namespaces]]
 binding = "CACHE"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "d07724c7d64c458bbd96b2e74230f306"
 
 [[kv_namespaces]]
 binding = "FEATURE_FLAGS"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "911f692b381643d78d51ad7bd7248168"
 
 # ---------------------------------------------------------------------------
 # R2 — assets, uploads, generated graphics, PDFs, media.
