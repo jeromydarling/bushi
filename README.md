@@ -155,7 +155,7 @@ bundles them.
 wrangler secret put SESSION_SECRET
 wrangler secret put STRIPE_SECRET_KEY
 wrangler secret put STRIPE_WEBHOOK_SECRET
-wrangler secret put RESEND_API_KEY
+# Email uses the native send_email binding — no secret required.
 ```
 
 ### Migrate, seed & deploy (remote)
@@ -213,8 +213,8 @@ dev, but need provisioned Cloudflare resources and/or API keys to fully activate
   suggestions need the `bushi-search` index and an embedding job.
 - **Workflows** (`@bushi/marketing`) — four lifecycle campaigns; the bindings are
   commented in `wrangler.toml` until the workflow classes are bundled.
-- **Notifications** (`@bushi/notifications`) — email templates + providers, pending
-  a send binding / Resend key.
+- **Notifications** (`@bushi/notifications`) — email templates + providers using
+  Cloudflare's native `send_email` binding (verify the sender domain in Email Routing).
 - **Bitoku integration** (`@bushi/integrations`) — sync interfaces + stubs; no
   live calls until configured.
 

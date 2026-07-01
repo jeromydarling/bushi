@@ -8,14 +8,13 @@ workers_dev = true
 # ---------------------------------------------------------------------------
 # D1 — relational source of record. Create with:
 #   wrangler d1 create bushi-db   (paste the returned database_id below)
-# Migrations live in the @bushi/db package.
+# Migrations live in the @bushi/db package (see migrations_dir below).
 # ---------------------------------------------------------------------------
-migrations_dir = "../../packages/db/migrations"
-
 [[d1_databases]]
 binding = "DB"
 database_name = "bushi-db"
 database_id = "79484850-e353-4008-a7ca-be44d8a08163"
+migrations_dir = "../../packages/db/migrations"
 
 # ---------------------------------------------------------------------------
 # Durable Objects — live mat rooms (WebSocket scoring state).
@@ -84,6 +83,14 @@ index_name = "bushi-search"
 [browser]
 binding = "BROWSER"
 
+# ---------------------------------------------------------------------------
+# Cloudflare Email Sending — native `send_email` binding (no third-party key).
+# The sender domain must be verified in Email Routing. `destination_address`
+# may be set to restrict recipients; omit for a verified domain / catch-all.
+# ---------------------------------------------------------------------------
+[[send_email]]
+name = "SEND_EMAIL"
+
 [vars]
 ENVIRONMENT = "development"
 AI_GATEWAY_ID = ""
@@ -91,7 +98,8 @@ APP_BASE_URL = "http://localhost:5173"
 
 # ---------------------------------------------------------------------------
 # Secrets (set via `wrangler secret put <NAME>`; never commit real values):
-#   SESSION_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY
+#   SESSION_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+# (Email uses the native send_email binding above — no API key needed.)
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

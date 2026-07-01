@@ -41,7 +41,8 @@ provisioned.
 | `SESSION_SECRET` | Session security |
 | `STRIPE_SECRET_KEY` | Live Stripe Checkout (stub without it) |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook verification (stub without it) |
-| `RESEND_API_KEY` | Outbound email |
+
+Email uses the native `send_email` binding (no secret).
 
 ---
 
@@ -153,10 +154,15 @@ certificates. **Consumed by:** `@bushi/rendering` (`renderToImage`,
 `renderToPdf`).
 
 ### Email
-No dedicated `wrangler.toml` binding block ships today — `@bushi/notifications`
-uses an injected fetch-capable send binding (MailChannels-style) or Resend via
-`RESEND_API_KEY`. Wire a `SEND_EMAIL` service binding / Worker route when
-activating outbound email.
+```toml
+[[send_email]]
+name = "SEND_EMAIL"
+```
+Cloudflare's native Email Sending (Email Workers) — no third-party key. The
+Worker builds a `cloudflare:email` `EmailMessage` and hands it to
+`@bushi/notifications`' `CloudflareSendEmailProvider`. The sender domain must be
+verified in **Email Routing**. **Consumed by:** `send_email` queue jobs /
+transactional email.
 
 ### Workflows (commented out)
 `@bushi/marketing` defines four workflow classes. Their `[[workflows]]` bindings
@@ -184,9 +190,9 @@ interface Env {
   ENVIRONMENT: string;
   AI_GATEWAY_ID: string;
   APP_BASE_URL: string;
+  SEND_EMAIL?: SendEmailBinding; // Cloudflare Email Sending
   SESSION_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
-  RESEND_API_KEY?: string;
 }
 ```

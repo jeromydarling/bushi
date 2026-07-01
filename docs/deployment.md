@@ -82,7 +82,8 @@ Never commit real secret values. Set them on the deployed Worker:
 wrangler secret put SESSION_SECRET          # any long random string
 wrangler secret put STRIPE_SECRET_KEY       # sk_live_... (enables live checkout)
 wrangler secret put STRIPE_WEBHOOK_SECRET   # whsec_...   (enables webhook handling)
-wrangler secret put RESEND_API_KEY          # enables outbound email
+# Email uses Cloudflare's native send_email binding — no secret needed. Verify
+# the sender domain in Email Routing (Dashboard → Email → Email Routing).
 ```
 
 All four are optional at the type level (`Env` marks them possibly-undefined) and

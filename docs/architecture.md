@@ -239,7 +239,7 @@ declaring exactly which Cloudflare bindings/secrets it expects — so the surfac
 area required to activate each one is explicit.
 
 ### Graceful degradation
-Optional bindings (`AI`, `SEARCH_INDEX`, `BROWSER`) and secrets
-(`STRIPE_SECRET_KEY`, `RESEND_API_KEY`, …) are typed as possibly-undefined in
+Optional bindings (`AI`, `SEARCH_INDEX`, `BROWSER`, `SEND_EMAIL`) and secrets
+(`STRIPE_SECRET_KEY`, …) are typed as possibly-undefined in
 `Env`. Route handlers check for them and fall back to deterministic stubs, so the
 whole app is demoable end-to-end in local dev with zero external accounts.

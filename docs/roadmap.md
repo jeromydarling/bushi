@@ -44,9 +44,9 @@ These are implemented behind interfaces and need real Cloudflare resources / key
 - [ ] **Browser Rendering cards.** Render `@bushi/rendering` templates (result
       cards, leaderboards, posters, OG images, certificates) to image/PDF and
       store in R2; attach OG images to public tournament/result pages.
-- [ ] **Email activation.** Back `@bushi/notifications` with a real send binding /
-      `RESEND_API_KEY`; enqueue `send_email` on registration confirmation, invites
-      and reminders.
+- [ ] **Email activation.** Wire `@bushi/notifications`' `CloudflareSendEmailProvider`
+      to the `send_email` binding (verify the sender domain in Email Routing);
+      enqueue `send_email` on registration confirmation, invites and reminders.
 
 ---
 

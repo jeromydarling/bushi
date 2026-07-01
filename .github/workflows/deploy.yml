@@ -12,11 +12,12 @@ name: Deploy to Cloudflare
 #                            baked into the web build so the SPA calls the live API.
 
 on:
+  # Deploys always run from main. Use "Run workflow" (workflow_dispatch) to
+  # deploy on demand.
   workflow_dispatch:
   push:
     branches:
       - main
-      - claude/bitoku-cloudflare-worker-1p05tl
     paths:
       - 'apps/**'
       - 'packages/**'

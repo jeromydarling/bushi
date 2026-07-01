@@ -19,7 +19,11 @@ export interface CloudflareEmailProviderConfig {
   defaultFrom?: string;
 }
 
-/** Production email provider posting a MailChannels-style payload. */
+/**
+ * Generic HTTP email provider posting a MailChannels-style payload. Kept as an
+ * option for external providers; the native, key-less path is
+ * `CloudflareSendEmailProvider` (the Worker `send_email` binding).
+ */
 export class CloudflareEmailProvider implements EmailProvider {
   private readonly endpoint: string;
   private readonly defaultFrom: string;
@@ -54,6 +58,94 @@ export class CloudflareEmailProvider implements EmailProvider {
     const id = res.headers.get('x-message-id') ?? crypto.randomUUID();
     return { id };
   }
+}
+
+/**
+ * Cloudflare Email Sending via the Worker `send_email` binding — the native
+ * path (no third-party key). The Worker constructs a `cloudflare:email`
+ * `EmailMessage` and hands it to this adapter, so this package stays free of
+ * the `cloudflare:email` import and compiles standalone.
+ *
+ * Wire in the Worker:
+ *   import { EmailMessage } from 'cloudflare:email';
+ *   const provider = new CloudflareSendEmailProvider({
+ *     from: 'Bushi <no-reply@bushi.app>',
+ *     adapter: { send: (m) => env.SEND_EMAIL.send(new EmailMessage(m.from, m.to, m.raw)) },
+ *   });
+ *
+ * The sender domain must be verified in Cloudflare Email Routing, and
+ * destination addresses verified (or covered by a catch-all) per Cloudflare's
+ * Email Workers rules.
+ */
+export interface SendEmailAdapter {
+  send(message: { from: string; to: string; raw: string }): Promise<void>;
+}
+
+export interface CloudflareSendEmailProviderConfig {
+  adapter: SendEmailAdapter;
+  /** Envelope + header From, e.g. "Bushi <no-reply@bushi.app>". */
+  from?: string;
+}
+
+export class CloudflareSendEmailProvider implements EmailProvider {
+  private readonly from: string;
+
+  constructor(private readonly config: CloudflareSendEmailProviderConfig) {
+    this.from = config.from ?? DEFAULT_FROM;
+  }
+
+  async send(msg: EmailMessage): Promise<{ id: string }> {
+    const fromHeader = msg.from ?? this.from;
+    const { email: fromEmail } = parseAddress(fromHeader);
+    const id = crypto.randomUUID();
+    const raw = buildMime({
+      from: fromHeader,
+      to: msg.to,
+      subject: msg.subject,
+      html: msg.html,
+      text: msg.text ?? stripHtml(msg.html),
+      replyTo: msg.replyTo,
+      messageId: `${id}@bushi.app`,
+    });
+    await this.config.adapter.send({ from: fromEmail, to: msg.to, raw });
+    return { id };
+  }
+}
+
+/** Build a minimal multipart/alternative RFC 822 message. */
+function buildMime(m: {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  replyTo?: string;
+  messageId: string;
+}): string {
+  const boundary = `bushi-${m.messageId.replace(/[^a-z0-9]/gi, '').slice(0, 24)}`;
+  const headers = [
+    `From: ${m.from}`,
+    `To: ${m.to}`,
+    `Subject: ${m.subject}`,
+    `Message-ID: <${m.messageId}>`,
+    ...(m.replyTo ? [`Reply-To: ${m.replyTo}`] : []),
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+  ];
+  return [
+    headers.join('\r\n'),
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    m.text,
+    `--${boundary}`,
+    'Content-Type: text/html; charset=utf-8',
+    '',
+    m.html,
+    `--${boundary}--`,
+    '',
+  ].join('\r\n');
 }
 
 /** Dev provider that logs instead of sending. */

@@ -32,6 +32,9 @@ export interface Env {
   // Browser Rendering
   BROWSER?: Fetcher;
 
+  // Cloudflare Email Sending (`send_email` binding). Optional in local dev.
+  SEND_EMAIL?: SendEmailBinding;
+
   // Vars
   ENVIRONMENT: string;
   AI_GATEWAY_ID: string;
@@ -41,7 +44,15 @@ export interface Env {
   SESSION_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
-  RESEND_API_KEY?: string;
+}
+
+/**
+ * The Cloudflare `send_email` binding (Email Workers). The Worker builds a
+ * `cloudflare:email` EmailMessage and passes it here. Typed loosely so env.ts
+ * needn't import the `cloudflare:email` module.
+ */
+export interface SendEmailBinding {
+  send(message: unknown): Promise<void>;
 }
 
 /** Messages placed on the JOBS queue for async fan-out. */
