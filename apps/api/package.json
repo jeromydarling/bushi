@@ -1,0 +1,31 @@
+{
+  "name": "@bushi/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate:local": "wrangler d1 migrations apply bushi-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply bushi-db --remote",
+    "db:seed:local": "wrangler d1 execute bushi-db --local --file=../../packages/db/seed/seed.sql",
+    "db:seed:remote": "wrangler d1 execute bushi-db --remote --file=../../packages/db/seed/seed.sql"
+  },
+  "dependencies": {
+    "@bushi/brackets": "workspace:*",
+    "@bushi/db": "workspace:*",
+    "@bushi/domain": "workspace:*",
+    "hono": "^4.6.14",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.95.0"
+  }
+}

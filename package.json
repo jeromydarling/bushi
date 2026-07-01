@@ -1,0 +1,26 @@
+{
+  "name": "bushi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bushi (武士) — the modern operating system for martial arts tournaments.",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/*\" build && pnpm --filter @bushi/web build",
+    "dev:web": "pnpm --filter @bushi/web dev",
+    "dev:api": "pnpm --filter @bushi/api dev",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:migrate:local": "pnpm --filter @bushi/api db:migrate:local",
+    "db:seed:local": "pnpm --filter @bushi/api db:seed:local",
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

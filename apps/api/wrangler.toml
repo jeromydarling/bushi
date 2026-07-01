@@ -1,0 +1,106 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "bushi-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-30"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# ---------------------------------------------------------------------------
+# D1 — relational source of record. Create with:
+#   wrangler d1 create bushi-db   (paste the returned database_id below)
+# Migrations live in the @bushi/db package.
+# ---------------------------------------------------------------------------
+migrations_dir = "../../packages/db/migrations"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bushi-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# ---------------------------------------------------------------------------
+# Durable Objects — live mat rooms (WebSocket scoring state).
+# ---------------------------------------------------------------------------
+[[durable_objects.bindings]]
+name = "MAT_ROOM"
+class_name = "MatRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["MatRoom"]
+
+# ---------------------------------------------------------------------------
+# KV — hot lookups, feature flags, ephemeral caches.
+# ---------------------------------------------------------------------------
+[[kv_namespaces]]
+binding = "CACHE"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[[kv_namespaces]]
+binding = "FEATURE_FLAGS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# ---------------------------------------------------------------------------
+# R2 — assets, uploads, generated graphics, PDFs, media.
+# ---------------------------------------------------------------------------
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "bushi-assets"
+
+[[r2_buckets]]
+binding = "GENERATED"
+bucket_name = "bushi-generated"
+
+# ---------------------------------------------------------------------------
+# Queues — background jobs & async fan-out.
+# ---------------------------------------------------------------------------
+[[queues.producers]]
+binding = "JOBS"
+queue = "bushi-jobs"
+
+[[queues.consumers]]
+queue = "bushi-jobs"
+max_batch_size = 10
+max_batch_timeout = 30
+
+# ---------------------------------------------------------------------------
+# Workers AI — text + image (FLUX) inference. AI Gateway id optional (var).
+# ---------------------------------------------------------------------------
+[ai]
+binding = "AI"
+
+# ---------------------------------------------------------------------------
+# Vectorize — embeddings / semantic search.
+#   wrangler vectorize create bushi-search --dimensions=768 --metric=cosine
+# ---------------------------------------------------------------------------
+[[vectorize]]
+binding = "SEARCH_INDEX"
+index_name = "bushi-search"
+
+# ---------------------------------------------------------------------------
+# Browser Rendering — share cards, posters, OG images, PDFs.
+# ---------------------------------------------------------------------------
+[browser]
+binding = "BROWSER"
+
+[vars]
+ENVIRONMENT = "development"
+AI_GATEWAY_ID = ""
+APP_BASE_URL = "http://localhost:5173"
+
+# ---------------------------------------------------------------------------
+# Secrets (set via `wrangler secret put <NAME>`; never commit real values):
+#   SESSION_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Cloudflare Workflows (uncomment once the Workflow classes are bundled here):
+# [[workflows]]
+# name = "pre-event-promotion"
+# binding = "PRE_EVENT_PROMOTION"
+# class_name = "PreEventPromotionWorkflow"
+#
+# [[workflows]]
+# name = "post-event-content"
+# binding = "POST_EVENT_CONTENT"
+# class_name = "PostEventContentWorkflow"
+# ---------------------------------------------------------------------------
