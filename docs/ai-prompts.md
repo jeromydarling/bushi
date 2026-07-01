@@ -165,3 +165,64 @@ so every stored asset is traceable back to the exact prompt + model that made it
 - Log every text generation to `ai_generations` (feature, model, prompt_key,
   latency, status) — as the `/api/ai` routes already do — for cost and quality
   observability.
+
+---
+
+## Cinematic hero video — "Blimp Cam" (Higgsfield)
+
+A ~30s looping aerial drift across tournament floors, used full-bleed in the
+homepage `SizzleReel` band. AI video models render short clips, so produce
+**4–6 clips (~6–8s each), one per style**, all using the same slow aerial camera
+move, then stitch into a seamless loop.
+
+### Camera / look (keep consistent across every clip)
+- **Camera move:** slow continuous aerial dolly + gentle pan — Higgsfield's
+  "Bird's-eye / drone drift" or "crane push-in" preset. No cuts, no shake.
+- **Altitude:** blimp-cam height — high enough to see the full mat + crowd, low
+  enough to read athletes.
+- **Grade:** premium sports-broadcast; restrained palette, cool neutrals with a
+  single warm accent light. Sharp, clean, editorial. 24fps, cinematic.
+- **Avoid:** dragons, flames, samurai cosplay, anime, neon, fantasy — nothing
+  cliché. Real modern tournament venues only.
+
+### Per-style prompts (one clip each)
+1. **Karate** — "Slow aerial drone drift over a modern indoor karate tournament:
+   multiple matted rings, athletes in white gi mid-kumite, referees, a full
+   crowd in the stands under clean arena lighting. Premium sports-broadcast grade,
+   restrained cool palette, cinematic 24fps, continuous smooth camera, no cuts."
+2. **Brazilian Jiu-Jitsu** — "…over a BJJ competition: grapplers in gi and no-gi
+   on blue and red mats, coaches cornering, packed bleachers, banners. Same slow
+   aerial drift, premium broadcast look."
+3. **Taekwondo** — "…over a taekwondo tournament: electronic hogu chest guards,
+   fast spinning kicks, digital scoreboards, bright disciplined arena."
+4. **Judo** — "…over a judo tournament: white and blue judogi, throws and mat
+   work on a tatami, formal officials, tiered crowd."
+5. **Kickboxing / amateur MMA** — "…over a striking event: a raised ring, wraps
+   and gloves, cornermen, a dense engaged crowd, moody key light."
+6. *(optional)* **Wide establisher** — "…highest altitude pass revealing the
+   whole multi-mat venue at once, crowd and warmup areas visible."
+
+### Format & delivery
+- **Aspect:** 16:9, 1080p (or 4K downscaled). Generate a 9:16 variant later if we
+  want a mobile-specific loop.
+- **Stitch + loop + compress** (ffmpeg): crossfade the clips and mute audio —
+  ```bash
+  # concat with 0.5s crossfades, then compress for web, then make a poster frame
+  ffmpeg -i c1.mp4 -i c2.mp4 -i c3.mp4 -i c4.mp4 -i c5.mp4 \
+    -filter_complex "[0][1]xfade=transition=fade:duration=0.5:offset=6[a];\
+    [a][2]xfade=transition=fade:duration=0.5:offset=11.5[b];\
+    [b][3]xfade=transition=fade:duration=0.5:offset=17[c];\
+    [c][4]xfade=transition=fade:duration=0.5:offset=22.5,format=yuv420p[v]" \
+    -map "[v]" -an sizzle_raw.mp4
+  ffmpeg -i sizzle_raw.mp4 -vf "scale=1920:-2" -c:v libx264 -crf 24 -preset slow \
+    -movflags +faststart -an bushi-sizzle.mp4
+  ffmpeg -i bushi-sizzle.mp4 -ss 2 -frames:v 1 bushi-sizzle-poster.jpg
+  ```
+- Aim for **< 8 MB**. Muted, looped, `playsInline` — handled by `SizzleReel`.
+
+### Wiring it into the site
+Host the file (see options in `deployment.md`), then set two build vars and
+re-deploy:
+- `VITE_HERO_VIDEO_URL` = public URL of `bushi-sizzle.mp4`
+- `VITE_HERO_VIDEO_POSTER` = public URL of `bushi-sizzle-poster.jpg`
+Until these are set, the band renders nothing (no layout impact).

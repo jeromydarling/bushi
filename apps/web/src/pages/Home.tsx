@@ -1,5 +1,6 @@
 import { STYLE_LABELS, MARTIAL_ARTS_STYLES } from '@bushi/domain';
 import { HeroArt } from '../components/HeroArt.js';
+import { SizzleReel } from '../components/SizzleReel.js';
 import { Badge, Button, Card, Container, Eyebrow, Section, Stat } from '../components/ui.js';
 import { useSeo } from '../lib/seo.js';
 
@@ -64,6 +65,9 @@ export function Home() {
           </div>
         </Container>
       </div>
+
+      {/* Cinematic blimp-cam band (renders only when VITE_HERO_VIDEO_URL is set) */}
+      <SizzleReel />
 
       {/* Personas */}
       <Section>
