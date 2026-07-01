@@ -1,0 +1,11 @@
+# Copy to apps/api/.dev.vars for local `wrangler dev`. Never commit real secrets.
+# .dev.vars is gitignored.
+
+SESSION_SECRET="dev-only-change-me"
+
+# Stripe (optional locally — billing runs in stub mode without these).
+STRIPE_SECRET_KEY=""
+STRIPE_WEBHOOK_SECRET=""
+
+# Transactional email (optional).
+RESEND_API_KEY=""
