@@ -1,0 +1,82 @@
+name: Deploy to Cloudflare
+
+# Deploys the Bushi Worker API and the web app (Pages) to Cloudflare.
+#
+# Required GitHub repository secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   — token with: Workers Scripts:Edit, Workers KV:Edit,
+#                            D1:Edit, R2:Edit, Queues:Edit, Vectorize:Edit,
+#                            Pages:Edit, Workers AI:Read, Account Settings:Read.
+#   CLOUDFLARE_ACCOUNT_ID  — your Cloudflare account id.
+# Optional repository variable (Settings → Secrets and variables → Actions → Variables):
+#   VITE_API_BASE          — the deployed Worker URL (e.g. https://bushi.<sub>.workers.dev),
+#                            baked into the web build so the SPA calls the live API.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - claude/bitoku-cloudflare-worker-1p05tl
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - '.github/workflows/deploy.yml'
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck & test
+        run: pnpm -r typecheck && pnpm -r test
+
+      # --- Provision the resources the MCP couldn't (idempotent) ---
+      - name: Ensure Vectorize index exists
+        working-directory: apps/api
+        continue-on-error: true
+        run: pnpm exec wrangler vectorize create bushi-search --dimensions=768 --metric=cosine
+
+      - name: Ensure Queue exists
+        working-directory: apps/api
+        continue-on-error: true
+        run: pnpm exec wrangler queues create bushi-jobs
+
+      # --- Deploy the Worker (binds D1/KV/R2/DO/Queue/Vectorize/AI/Browser) ---
+      - name: Deploy Worker
+        working-directory: apps/api
+        run: pnpm exec wrangler deploy
+
+      # --- Build + deploy the web app to Cloudflare Pages ---
+      - name: Build web
+        run: pnpm --filter @bushi/web build
+        env:
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+
+      - name: Deploy web to Pages
+        working-directory: apps/api
+        run: >
+          pnpm exec wrangler pages deploy "$GITHUB_WORKSPACE/apps/web/dist"
+          --project-name=bushi-web
+          --branch=main
+          --commit-dirty=true
