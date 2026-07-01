@@ -17,6 +17,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@bushi/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@bushi/brackets':
         specifier: workspace:*
         version: link:../../packages/brackets

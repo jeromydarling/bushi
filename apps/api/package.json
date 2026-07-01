@@ -16,6 +16,7 @@
     "db:seed:remote": "wrangler d1 execute bushi-db --remote --file=../../packages/db/seed/seed.sql"
   },
   "dependencies": {
+    "@bushi/ai": "workspace:*",
     "@bushi/brackets": "workspace:*",
     "@bushi/db": "workspace:*",
     "@bushi/domain": "workspace:*",

@@ -44,6 +44,7 @@ export interface Env {
   SESSION_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  PERPLEXITY_API_KEY?: string;
 }
 
 /**

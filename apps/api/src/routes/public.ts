@@ -2,40 +2,140 @@ import { Hono } from 'hono';
 import { Db, type SchoolRow, type TournamentRow } from '@bushi/db';
 import type { AppBindings } from '../types.js';
 import { HttpError } from '../lib/http.js';
+import { ingestQuery } from '../lib/discovery.js';
 
 /** Unauthenticated, cacheable, SEO-facing endpoints. */
 export const publicRoutes = new Hono<AppBindings>();
 
-// Tournament discovery with keyword + style + timeframe filters.
-publicRoutes.get('/discover', async (c) => {
-  const db = new Db(c.env.DB);
-  const q = c.req.query('q')?.trim();
-  const style = c.req.query('style');
-  const timeframe = c.req.query('timeframe') ?? 'all';
+/** Unified discovery result shape (Bushi-hosted + web-discovered). */
+interface DiscoverItem {
+  id: string;
+  source: 'bushi' | 'web';
+  name: string;
+  slug: string | null;
+  styles: string[];
+  startDate: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  status: string | null;
+  sourceUrl: string | null;
+}
+
+function parseStyles(json: string): string[] {
+  try {
+    const v = JSON.parse(json);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+async function queryDiscover(
+  db: Db,
+  opts: { q?: string; style?: string; timeframe?: string },
+): Promise<DiscoverItem[]> {
   const today = new Date().toISOString().slice(0, 10);
 
-  const clauses = ["is_public = 1", 'deleted_at IS NULL'];
-  const params: unknown[] = [];
-  if (q) {
-    clauses.push('(name LIKE ? OR city LIKE ? OR region LIKE ?)');
-    params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+  // First-party tournaments.
+  const bushiClauses = ['is_public = 1', 'deleted_at IS NULL'];
+  const bushiParams: unknown[] = [];
+  if (opts.q) {
+    bushiClauses.push('(name LIKE ? OR city LIKE ? OR region LIKE ?)');
+    bushiParams.push(`%${opts.q}%`, `%${opts.q}%`, `%${opts.q}%`);
   }
-  if (style) {
-    clauses.push('styles LIKE ?');
-    params.push(`%"${style}"%`);
+  if (opts.style) {
+    bushiClauses.push('styles LIKE ?');
+    bushiParams.push(`%"${opts.style}"%`);
   }
-  if (timeframe === 'upcoming') {
-    clauses.push('start_date >= ?');
-    params.push(today);
-  } else if (timeframe === 'completed') {
-    clauses.push("status = 'completed'");
+  if (opts.timeframe === 'upcoming') {
+    bushiClauses.push('start_date >= ?');
+    bushiParams.push(today);
+  } else if (opts.timeframe === 'completed') {
+    bushiClauses.push("status = 'completed'");
+  }
+  const bushi = await db.all<TournamentRow>(
+    `SELECT * FROM tournaments WHERE ${bushiClauses.join(' AND ')} ORDER BY start_date DESC LIMIT 60`,
+    ...bushiParams,
+  );
+
+  // Web-discovered tournaments (only surfaced for 'all'/'upcoming').
+  let web: Array<Record<string, unknown>> = [];
+  if (opts.timeframe !== 'completed') {
+    const webClauses = ["status = 'published'"];
+    const webParams: unknown[] = [];
+    if (opts.q) {
+      webClauses.push('(name LIKE ? OR city LIKE ? OR region LIKE ?)');
+      webParams.push(`%${opts.q}%`, `%${opts.q}%`, `%${opts.q}%`);
+    }
+    if (opts.style) {
+      webClauses.push('styles LIKE ?');
+      webParams.push(`%"${opts.style}"%`);
+    }
+    web = await db.all<Record<string, unknown>>(
+      `SELECT * FROM discovered_tournaments WHERE ${webClauses.join(' AND ')} ORDER BY start_date IS NULL, start_date LIMIT 60`,
+      ...webParams,
+    );
   }
 
-  const rows = await db.all<TournamentRow>(
-    `SELECT * FROM tournaments WHERE ${clauses.join(' AND ')} ORDER BY start_date DESC LIMIT 60`,
-    ...params,
-  );
-  return c.json({ tournaments: rows });
+  return [
+    ...bushi.map((t): DiscoverItem => ({
+      id: t.id,
+      source: 'bushi',
+      name: t.name,
+      slug: t.slug,
+      styles: parseStyles(t.styles),
+      startDate: t.start_date,
+      city: t.city,
+      region: t.region,
+      country: t.country,
+      status: t.status,
+      sourceUrl: null,
+    })),
+    ...web.map((r): DiscoverItem => ({
+      id: String(r.id),
+      source: 'web',
+      name: String(r.name),
+      slug: null,
+      styles: parseStyles(String(r.styles ?? '[]')),
+      startDate: (r.start_date as string | null) ?? (r.start_date_text as string | null),
+      city: (r.city as string | null) ?? null,
+      region: (r.region as string | null) ?? null,
+      country: (r.country as string | null) ?? null,
+      status: 'external',
+      sourceUrl: (r.registration_url as string | null) ?? (r.source_url as string | null),
+    })),
+  ];
+}
+
+// Tournament discovery (Bushi-hosted + web-discovered) with filters.
+publicRoutes.get('/discover', async (c) => {
+  const db = new Db(c.env.DB);
+  const results = await queryDiscover(db, {
+    q: c.req.query('q')?.trim(),
+    style: c.req.query('style'),
+    timeframe: c.req.query('timeframe') ?? 'all',
+  });
+  return c.json({ results });
+});
+
+// On-demand web search — runs a live Perplexity query, upserts, returns matches.
+// KV-cached for an hour per query to control cost.
+publicRoutes.get('/discover/web', async (c) => {
+  const q = c.req.query('q')?.trim();
+  if (!q || q.length < 3) throw new HttpError(400, 'Query must be at least 3 characters');
+  const cacheKey = `discover:web:${q.toLowerCase()}`;
+
+  const cached = await c.env.CACHE.get(cacheKey);
+  if (cached) return c.json({ results: JSON.parse(cached), cached: true });
+
+  const query = `Upcoming martial arts tournaments matching "${q}" in the next 6 months, with dates, city, country, styles, organizer, and official registration links.`;
+  const outcome = await ingestQuery(c.env, query, 'on_demand');
+  const db = new Db(c.env.DB);
+  const results = await queryDiscover(db, { q, timeframe: 'all' });
+  // Cache for 1h (KV min TTL 60s).
+  await c.env.CACHE.put(cacheKey, JSON.stringify(results), { expirationTtl: 3600 });
+  return c.json({ results, found: outcome.found });
 });
 
 publicRoutes.get('/tournaments/:slug', async (c) => {

@@ -9,4 +9,5 @@ export const MIGRATIONS = [
   '0004_commerce.sql',
   '0005_marketing_ai.sql',
   '0006_public_seo.sql',
+  '0007_discovery.sql',
 ] as const;

@@ -91,6 +91,13 @@ binding = "BROWSER"
 [[send_email]]
 name = "SEND_EMAIL"
 
+# ---------------------------------------------------------------------------
+# Cron — nightly tournament discovery (Perplexity → D1). No-ops without
+# PERPLEXITY_API_KEY set.
+# ---------------------------------------------------------------------------
+[triggers]
+crons = ["0 7 * * *"]
+
 [vars]
 ENVIRONMENT = "development"
 AI_GATEWAY_ID = ""
@@ -98,8 +105,9 @@ APP_BASE_URL = "http://localhost:5173"
 
 # ---------------------------------------------------------------------------
 # Secrets (set via `wrangler secret put <NAME>`; never commit real values):
-#   SESSION_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+#   SESSION_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, PERPLEXITY_API_KEY
 # (Email uses the native send_email binding above — no API key needed.)
+# PERPLEXITY_API_KEY powers the discovery cron + on-demand web search.
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

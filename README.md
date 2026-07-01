@@ -155,6 +155,7 @@ bundles them.
 wrangler secret put SESSION_SECRET
 wrangler secret put STRIPE_SECRET_KEY
 wrangler secret put STRIPE_WEBHOOK_SECRET
+wrangler secret put PERPLEXITY_API_KEY   # powers tournament discovery (cron + web search)
 # Email uses the native send_email binding — no secret required.
 ```
 

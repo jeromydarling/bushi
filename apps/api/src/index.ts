@@ -7,6 +7,7 @@ import type { Env, JobMessage } from './env.js';
 import { HttpError } from './lib/http.js';
 import { uuid } from './lib/crypto.js';
 import { loadSession } from './middleware/auth.js';
+import { ingestAll } from './lib/discovery.js';
 import { authRoutes } from './routes/auth.js';
 import { tournamentRoutes } from './routes/tournaments.js';
 import { schoolRoutes } from './routes/schools.js';
@@ -50,6 +51,15 @@ app.notFound((c) => c.json({ error: 'Not found' }, 404));
 
 export default {
   fetch: app.fetch,
+
+  /** Cron trigger — nightly tournament discovery via Perplexity → D1. */
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      ingestAll(env)
+        .then((r) => console.log('Discovery run:', r))
+        .catch((err) => console.error('Discovery run failed:', err)),
+    );
+  },
 
   /** Queue consumer — background side effects (persistence, email, indexing). */
   async queue(batch: MessageBatch<JobMessage>, env: Env): Promise<void> {

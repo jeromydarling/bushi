@@ -124,6 +124,30 @@ export const registrationSchema = z.object({
 export type RegistrationInput = z.infer<typeof registrationSchema>;
 
 // ---------------------------------------------------------------------------
+// Discovery (Perplexity-sourced external tournaments)
+// ---------------------------------------------------------------------------
+
+/** One tournament as extracted from a web search by Perplexity. */
+export const discoveredTournamentSchema = z.object({
+  name: z.string().min(3).max(200),
+  startDate: z.string().min(4).max(40), // free-form; normalized downstream
+  endDate: z.string().max(40).optional(),
+  city: z.string().max(120).optional(),
+  region: z.string().max(120).optional(),
+  country: z.string().max(120).optional(),
+  styles: z.array(z.enum(MARTIAL_ARTS_STYLES)).default([]),
+  organizer: z.string().max(200).optional(),
+  sourceUrl: z.string().url().max(600).optional(),
+  registrationUrl: z.string().url().max(600).optional(),
+});
+export type DiscoveredTournamentInput = z.infer<typeof discoveredTournamentSchema>;
+
+/** Perplexity is asked to return `{ tournaments: [...] }`. */
+export const discoveryResponseSchema = z.object({
+  tournaments: z.array(discoveredTournamentSchema).max(50),
+});
+
+// ---------------------------------------------------------------------------
 // Live scoring events (client -> MatRoomDO)
 // ---------------------------------------------------------------------------
 

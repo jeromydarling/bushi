@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { Db } from '@bushi/db';
 import type { AppBindings } from '../types.js';
 import { requireRole } from '../middleware/auth.js';
+import { ingestAll } from '../lib/discovery.js';
 
 /** Internal admin surface — restricted to platform_admin. */
 export const adminRoutes = new Hono<AppBindings>();
@@ -17,6 +18,20 @@ adminRoutes.get('/search', async (c) => {
     db.all<Record<string, unknown>>(`SELECT id,name,slug,status FROM tournaments WHERE name LIKE ? LIMIT 20`, q),
   ]);
   return c.json({ users, schools, tournaments });
+});
+
+// Manually trigger the Perplexity discovery batch (same as the nightly cron).
+adminRoutes.post('/discovery/refresh', async (c) => {
+  const result = await ingestAll(c.env);
+  return c.json({ ok: true, ...result });
+});
+
+adminRoutes.get('/discovery/runs', async (c) => {
+  const db = new Db(c.env.DB);
+  const runs = await db.all<Record<string, unknown>>(
+    `SELECT trigger,query,found,inserted,updated,status,error,created_at FROM discovery_runs ORDER BY created_at DESC LIMIT 50`,
+  );
+  return c.json({ runs });
 });
 
 adminRoutes.get('/audit-logs', async (c) => {

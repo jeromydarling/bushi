@@ -46,6 +46,22 @@ export const api = {
   me: () => request<{ id: string; email: string; roles: string[] }>('/api/auth/me'),
   createTournament: (body: unknown) =>
     request<{ tournament: unknown }>('/api/tournaments', { method: 'POST', body: JSON.stringify(body) }),
-  discover: (params: string) => request<{ tournaments: unknown[] }>(`/api/public/discover?${params}`),
+  discover: (params: string) => request<{ results: DiscoverItem[] }>(`/api/public/discover?${params}`),
+  discoverWeb: (q: string) => request<{ results: DiscoverItem[]; found?: number }>(`/api/public/discover/web?q=${encodeURIComponent(q)}`),
   plans: () => request<{ tiers: Array<{ tier: string; monthlyCents: number; annualCents: number }> }>('/api/billing/plans'),
 };
+
+/** Unified discovery item (Bushi-hosted or web-discovered). */
+export interface DiscoverItem {
+  id: string;
+  source: 'bushi' | 'web';
+  name: string;
+  slug: string | null;
+  styles: string[];
+  startDate: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  status: string | null;
+  sourceUrl: string | null;
+}
