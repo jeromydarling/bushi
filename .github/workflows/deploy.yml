@@ -88,6 +88,11 @@ jobs:
         env:
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
 
+      - name: Ensure Pages project exists
+        working-directory: apps/api
+        continue-on-error: true
+        run: pnpm exec wrangler pages project create bushi-web --production-branch=main
+
       - name: Deploy web to Pages
         working-directory: apps/api
         run: >
