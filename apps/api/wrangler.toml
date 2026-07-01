@@ -24,9 +24,11 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 name = "MAT_ROOM"
 class_name = "MatRoom"
 
+# SQLite-backed Durable Objects (required on the Workers Free plan and the
+# current default). MatRoom persists via ctx.storage, which is SQLite-compatible.
 [[migrations]]
 tag = "v1"
-new_classes = ["MatRoom"]
+new_sqlite_classes = ["MatRoom"]
 
 # ---------------------------------------------------------------------------
 # KV — hot lookups, feature flags, ephemeral caches.

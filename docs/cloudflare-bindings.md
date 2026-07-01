@@ -68,7 +68,7 @@ class_name = "MatRoom"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["MatRoom"]
+new_sqlite_classes = ["MatRoom"]
 ```
 One instance per match (`idFromName(matchId)`). Owns live match state, accepts
 validated scoring events, broadcasts state frames, and enqueues persistence.

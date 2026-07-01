@@ -111,7 +111,7 @@ pnpm --filter @bushi/api deploy    # wrangler deploy
 ```
 
 This ships the Hono app, registers the `MatRoom` Durable Object (migration tag
-`v1`, `new_classes = ["MatRoom"]`), binds the queue consumer, and enables Workers
+`v1`, `new_sqlite_classes = ["MatRoom"]`), binds the queue consumer, and enables Workers
 AI + Browser Rendering. Smoke-test:
 
 ```bash
