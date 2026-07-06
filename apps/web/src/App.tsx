@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { MarketingLayout } from './layouts/MarketingLayout.js';
 import { AppLayout } from './layouts/AppLayout.js';
@@ -8,6 +9,12 @@ import { Compare } from './pages/Compare.js';
 import { Pricing } from './pages/Pricing.js';
 import { AuthPage } from './pages/Auth.js';
 import { Admin } from './pages/Admin.js';
+import { CrmLayout } from './layouts/CrmLayout.js';
+import { Overview as CrmOverview } from './pages/admin/crm/Overview.js';
+import { Customers as CrmCustomers } from './pages/admin/crm/Customers.js';
+import { CustomerProfile as CrmCustomerProfile } from './pages/admin/crm/CustomerProfile.js';
+// Code-split the map — mapbox-gl is heavy and only needed on this one route.
+const CrmMap = lazy(() => import('./pages/admin/crm/CrmMap.js').then((m) => ({ default: m.CrmMap })));
 import { NotFound } from './pages/NotFound.js';
 import { Dashboard } from './pages/app/Dashboard.js';
 import { TournamentWizard } from './pages/app/TournamentWizard.js';
@@ -48,6 +55,21 @@ export function App() {
         {/* Mat room is full-bleed (own chrome) */}
         <Route path="/app/tournaments/:id/mat/:mat" element={<MatRoom />} />
         <Route path="/admin" element={<Admin />} />
+
+        {/* Super-admin CRM */}
+        <Route path="/admin/crm" element={<CrmLayout />}>
+          <Route index element={<CrmOverview />} />
+          <Route path="customers" element={<CrmCustomers />} />
+          <Route path="customers/:id" element={<CrmCustomerProfile />} />
+          <Route
+            path="map"
+            element={
+              <Suspense fallback={<div className="p-8 text-sm text-ink-500">Loading map…</div>}>
+                <CrmMap />
+              </Suspense>
+            }
+          />
+        </Route>
 
         {/* Public event pages */}
         <Route element={<PublicLayout />}>

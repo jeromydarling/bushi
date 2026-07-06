@@ -52,7 +52,170 @@ export const api = {
     request<{ ok: boolean; found: number; inserted: number; updated: number }>('/api/admin/discovery/refresh', { method: 'POST' }),
   discoveryRuns: () => request<{ runs: DiscoveryRun[] }>('/api/admin/discovery/runs'),
   plans: () => request<{ tiers: Array<{ tier: string; monthlyCents: number; annualCents: number }> }>('/api/billing/plans'),
+
+  // ── CRM (super-admin) ─────────────────────────────────────────────────────
+  crmOverview: () => request<CrmOverview>('/api/admin/crm/overview'),
+  crmMap: () => request<{ points: CrmMapPoint[] }>('/api/admin/crm/map'),
+  crmCustomers: (params?: string) =>
+    request<{ customers: CustomerSummary[] }>(`/api/admin/crm/customers${params ? `?${params}` : ''}`),
+  crmCustomer: (id: string) => request<CustomerDetail>(`/api/admin/crm/customers/${id}`),
+  crmUpdateCustomer: (id: string, body: CrmCustomerPatch) =>
+    request<{ ok: boolean }>(`/api/admin/crm/customers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  crmAddInteraction: (id: string, body: CrmInteractionInput) =>
+    request<{ ok: boolean; id: string; emailed: boolean }>(`/api/admin/crm/customers/${id}/interactions`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  crmAddTask: (id: string, body: { title: string; dueAt?: number }) =>
+    request<{ ok: boolean; id: string }>(`/api/admin/crm/customers/${id}/tasks`, { method: 'POST', body: JSON.stringify(body) }),
+  crmUpdateTask: (id: string, body: { status: 'open' | 'done' }) =>
+    request<{ ok: boolean }>(`/api/admin/crm/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  crmAddTicket: (id: string, body: { subject: string; body?: string; priority?: TicketPriority }) =>
+    request<{ ok: boolean; id: string }>(`/api/admin/crm/customers/${id}/tickets`, { method: 'POST', body: JSON.stringify(body) }),
+  crmUpdateTicket: (id: string, body: { status: TicketStatus }) =>
+    request<{ ok: boolean }>(`/api/admin/crm/tickets/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  crmRecomputeHealth: (id: string) =>
+    request<CrmHealth>(`/api/admin/crm/customers/${id}/health/recompute`, { method: 'POST' }),
+  crmRecomputeAll: () =>
+    request<{ ok: boolean; updated: number; flagged: number }>('/api/admin/crm/recompute-all', { method: 'POST' }),
 };
+
+// ── CRM types ────────────────────────────────────────────────────────────────
+
+export type LifecycleStage = 'trial' | 'onboarding' | 'active' | 'at_risk' | 'churned' | 'won_back';
+export type InteractionKind = 'note' | 'call' | 'email' | 'meeting';
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed';
+
+export interface CustomerSummary {
+  id: string;
+  orgId: string | null;
+  name: string;
+  lifecycleStage: string;
+  healthScore: number;
+  healthReason: string | null;
+  mrrCents: number;
+  ownerName: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  lat: number | null;
+  lng: number | null;
+  tags: string[];
+  atRisk: boolean;
+}
+
+export interface CrmTaskDue {
+  id: string;
+  title: string;
+  due_at: number | null;
+  status: string;
+  customer_id: string;
+  customer_name: string;
+}
+
+export interface CrmOverview {
+  tiles: { customers: number; atRisk: number; mrrCents: number; atRiskMrrCents: number; tasksDue: number };
+  atRiskCustomers: CustomerSummary[];
+  tasksDue: CrmTaskDue[];
+}
+
+export interface CrmMapPoint {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  stage: string;
+  healthScore: number;
+  mrrCents: number;
+  atRisk: boolean;
+}
+
+export interface CrmContact {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  is_primary: number;
+}
+
+export interface CrmInteraction {
+  id: string;
+  kind: string;
+  subject: string | null;
+  body: string;
+  follow_up_at: number | null;
+  created_at: number;
+  author_name: string | null;
+}
+
+export interface CrmTask {
+  id: string;
+  title: string;
+  due_at: number | null;
+  status: string;
+  source: string;
+  created_at: number;
+}
+
+export interface CrmTicket {
+  id: string;
+  subject: string;
+  body: string | null;
+  status: string;
+  priority: string;
+  created_at: number;
+}
+
+export interface CrmHealthFactor {
+  label: string;
+  value: number;
+}
+
+export interface CrmHealth {
+  score: number;
+  reason: string;
+  factors: CrmHealthFactor[];
+}
+
+export interface CrmHealthTrendPoint {
+  score: number;
+  created_at: number;
+}
+
+export interface CustomerDetail {
+  customer: CustomerSummary;
+  contacts: CrmContact[];
+  interactions: CrmInteraction[];
+  tasks: CrmTask[];
+  tickets: CrmTicket[];
+  health: CrmHealth;
+  healthTrend: CrmHealthTrendPoint[];
+}
+
+export interface CrmCustomerPatch {
+  lifecycleStage?: LifecycleStage;
+  ownerUserId?: string;
+  mrrCents?: number;
+  tags?: string[];
+  lat?: number;
+  lng?: number;
+}
+
+export interface CrmInteractionInput {
+  kind: InteractionKind;
+  subject?: string;
+  body: string;
+  followUpAt?: number;
+}
+
+/** Maps an ApiResult failure to a friendly, degrade-gracefully message. */
+export function crmErrorMessage(status: number, error: string): string {
+  if (status === 0) return 'Connect the API (VITE_API_BASE) to load CRM data.';
+  if (status === 401 || status === 403) return 'Sign in as a platform admin.';
+  return error;
+}
 
 export interface DiscoveryRun {
   trigger: string;

@@ -40,6 +40,18 @@ export function Admin() {
       <div className="mx-auto max-w-5xl space-y-6 p-5 sm:p-8">
         <h1 className="font-display text-2xl font-bold text-white not-dark:text-ink-900">Platform admin</h1>
 
+        <Card interactive className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-white not-dark:text-ink-900">Customer CRM</h2>
+            <p className="mt-1 text-sm text-ink-400">
+              Retention radar, customer health, at-risk accounts, follow-ups and the customer map.
+            </p>
+          </div>
+          <Button as="link" to="/admin/crm" className="shrink-0">
+            Open CRM →
+          </Button>
+        </Card>
+
         <Card>
           <input
             value={q}
