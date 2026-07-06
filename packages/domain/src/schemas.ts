@@ -1,8 +1,12 @@
 import { z } from 'zod';
 import {
   BRACKET_FORMATS,
+  INTERACTION_KINDS,
+  LIFECYCLE_STAGES,
   MARTIAL_ARTS_STYLES,
   ROLES,
+  TICKET_PRIORITIES,
+  TICKET_STATUSES,
   TOURNAMENT_STATUSES,
 } from './constants.js';
 
@@ -145,6 +149,45 @@ export type DiscoveredTournamentInput = z.infer<typeof discoveredTournamentSchem
 /** Perplexity is asked to return `{ tournaments: [...] }`. */
 export const discoveryResponseSchema = z.object({
   tournaments: z.array(discoveredTournamentSchema).max(50),
+});
+
+// ---------------------------------------------------------------------------
+// CRM (super-admin)
+// ---------------------------------------------------------------------------
+
+export const createInteractionSchema = z.object({
+  kind: z.enum(INTERACTION_KINDS),
+  subject: z.string().max(200).optional(),
+  body: z.string().min(1).max(8000),
+  followUpAt: z.number().int().optional(), // epoch ms
+});
+
+export const createTaskSchema = z.object({
+  title: z.string().min(1).max(200),
+  dueAt: z.number().int().optional(),
+});
+
+export const updateTaskSchema = z.object({
+  status: z.enum(['open', 'done']),
+});
+
+export const createTicketSchema = z.object({
+  subject: z.string().min(1).max(200),
+  body: z.string().max(8000).optional(),
+  priority: z.enum(TICKET_PRIORITIES).default('normal'),
+});
+
+export const updateTicketSchema = z.object({
+  status: z.enum(TICKET_STATUSES),
+});
+
+export const updateCustomerSchema = z.object({
+  lifecycleStage: z.enum(LIFECYCLE_STAGES).optional(),
+  ownerUserId: z.string().optional(),
+  mrrCents: z.number().int().min(0).optional(),
+  tags: z.array(z.string().max(40)).optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
 });
 
 // ---------------------------------------------------------------------------

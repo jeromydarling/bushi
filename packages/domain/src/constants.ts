@@ -94,6 +94,32 @@ export type RegistrationStatus = (typeof REGISTRATION_STATUSES)[number];
 export const SUBSCRIPTION_TIERS = ['free', 'starter', 'pro', 'enterprise'] as const;
 export type SubscriptionTier = (typeof SUBSCRIPTION_TIERS)[number];
 
+// ---------------------------------------------------------------------------
+// CRM / customer health (super-admin)
+// ---------------------------------------------------------------------------
+
+export const LIFECYCLE_STAGES = [
+  'trial',
+  'onboarding',
+  'active',
+  'at_risk',
+  'churned',
+  'won_back',
+] as const;
+export type LifecycleStage = (typeof LIFECYCLE_STAGES)[number];
+
+export const INTERACTION_KINDS = ['note', 'call', 'email', 'meeting'] as const;
+export type InteractionKind = (typeof INTERACTION_KINDS)[number];
+
+export const TICKET_STATUSES = ['open', 'pending', 'resolved', 'closed'] as const;
+export type TicketStatus = (typeof TICKET_STATUSES)[number];
+
+export const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
+export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
+
+/** Below this health score a customer is considered at-risk. */
+export const AT_RISK_THRESHOLD = 50;
+
 /** Belt / rank systems vary by style; we store a normalized ordinal + label. */
 export const BELT_SYSTEMS: Record<string, string[]> = {
   bjj: ['White', 'Blue', 'Purple', 'Brown', 'Black'],

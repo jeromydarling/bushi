@@ -17,6 +17,8 @@ import { publicRoutes } from './routes/public.js';
 import { billingRoutes } from './routes/billing.js';
 import { aiRoutes } from './routes/ai.js';
 import { adminRoutes } from './routes/admin.js';
+import { crmRoutes } from './routes/crm.js';
+import { recomputeAllHealth } from './lib/health.js';
 
 export { MatRoom } from './do/MatRoom.js';
 
@@ -38,6 +40,7 @@ app.route('/api/public', publicRoutes);
 app.route('/api/billing', billingRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/admin', adminRoutes);
+app.route('/api/admin/crm', crmRoutes);
 
 app.onError((err, c) => {
   if (err instanceof HttpError) {
@@ -52,12 +55,15 @@ app.notFound((c) => c.json({ error: 'Not found' }, 404));
 export default {
   fetch: app.fetch,
 
-  /** Cron trigger — nightly tournament discovery via Perplexity → D1. */
+  /** Cron trigger — nightly discovery (Perplexity) + customer-health recompute. */
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(
-      ingestAll(env)
-        .then((r) => console.log('Discovery run:', r))
-        .catch((err) => console.error('Discovery run failed:', err)),
+      Promise.allSettled([
+        ingestAll(env).then((r) => console.log('Discovery run:', r)),
+        recomputeAllHealth(env).then((r) => console.log('Health recompute:', r)),
+      ]).then((results) => {
+        for (const r of results) if (r.status === 'rejected') console.error('Scheduled task failed:', r.reason);
+      }),
     );
   },
 
