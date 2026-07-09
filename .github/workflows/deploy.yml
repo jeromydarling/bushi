@@ -7,9 +7,13 @@ name: Deploy to Cloudflare
 #                            D1:Edit, R2:Edit, Queues:Edit, Vectorize:Edit,
 #                            Pages:Edit, Workers AI:Read, Account Settings:Read.
 #   CLOUDFLARE_ACCOUNT_ID  — your Cloudflare account id.
-# Optional repository variable (Settings → Secrets and variables → Actions → Variables):
+# Optional repository variables (Settings → Secrets and variables → Actions → Variables):
 #   VITE_API_BASE          — the deployed Worker URL (e.g. https://bushi.<sub>.workers.dev),
 #                            baked into the web build so the SPA calls the live API.
+#   VITE_HERO_VIDEO_URL    — hero "blimp-cam" video URL (e.g. <worker>/media/hero/mat-blimp.mp4,
+#                            produced by the hero-video.yml workflow). Unset = no hero band.
+#   VITE_HERO_VIDEO_POSTER — poster still for the hero (reduced-motion fallback).
+#   VITE_MAPBOX_TOKEN      — Mapbox token for the super-admin CRM customer map.
 
 on:
   # Deploys always run from main. Use "Run workflow" (workflow_dispatch) to
@@ -87,6 +91,9 @@ jobs:
         run: pnpm --filter @bushi/web build
         env:
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          VITE_HERO_VIDEO_URL: ${{ vars.VITE_HERO_VIDEO_URL }}
+          VITE_HERO_VIDEO_POSTER: ${{ vars.VITE_HERO_VIDEO_POSTER }}
+          VITE_MAPBOX_TOKEN: ${{ vars.VITE_MAPBOX_TOKEN }}
 
       - name: Ensure Pages project exists
         working-directory: apps/api

@@ -1,0 +1,170 @@
+name: Hero video (ElevenLabs music → mux → R2)
+
+# Builds the marketing hero "blimp-cam" video: generates an instrumental track
+# with the ElevenLabs Music API, strips the source clip's generated SFX, muxes
+# the track under a looped copy of the clip, and uploads the result to the
+# bushi-generated R2 bucket (served publicly via the Worker's /media/* route).
+#
+# The ElevenLabs key never leaves the runner. Add it as a repository secret named
+# ELEVENLABS_API_KEY (the resolver also accepts a few common alternate names).
+# Trigger from the Actions tab → "Run workflow", or via API.
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: Source clip URL (the chosen top-down Higgsfield render)
+        required: true
+        default: https://d8j0ntlcm91z4.cloudfront.net/user_3EAi4t8027YkOFVq889czCthbmJ/hf_20260709_161920_46214dbe-5499-469d-ad45-a840c706641c.mp4
+      music_prompt:
+        description: ElevenLabs music prompt (instrumental)
+        required: true
+        default: >-
+          High-energy cinematic sports-hype instrumental for a martial arts highlight reel.
+          Driving taiko and modern hybrid trailer percussion, hard-hitting braams, tense
+          rising strings, aggressive and confident, relentless forward momentum, arena-anthem
+          energy. Purely instrumental, no vocals.
+      loops:
+        description: How many times to repeat the clip (visual length = clip × loops)
+        required: true
+        default: '4'
+      music_length_ms:
+        description: Music length in ms (match the looped video duration, 3000-600000)
+        required: true
+        default: '20000'
+      r2_key:
+        description: Destination key in the bushi-generated R2 bucket
+        required: true
+        default: hero/mat-blimp.mp4
+
+concurrency:
+  group: hero-video
+  cancel-in-progress: true
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve ElevenLabs key (accepts several common secret names)
+        run: |
+          KEY="${{ secrets.ELEVENLABS_API_KEY }}"
+          KEY="${KEY:-${{ secrets.ELEVEN_API_KEY }}}"
+          KEY="${KEY:-${{ secrets.XI_API_KEY }}}"
+          KEY="${KEY:-${{ secrets.ELEVENLABS_KEY }}}"
+          KEY="${KEY:-${{ secrets.ELEVEN_LABS_API_KEY }}}"
+          if [ -z "$KEY" ]; then
+            echo "::error::No ElevenLabs API key found. Add a repository secret named EXACTLY 'ELEVENLABS_API_KEY' at Settings → Secrets and variables → Actions → the Secrets tab (not Variables)."
+            exit 1
+          fi
+          echo "::add-mask::$KEY"
+          echo "ELEVENLABS_API_KEY=$KEY" >> "$GITHUB_ENV"
+          echo "✅ ElevenLabs key found (length ${#KEY})."
+
+      - name: Preflight — Cloudflare credentials
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID missing (needed for the R2 upload)."
+            exit 1
+          fi
+
+      - name: Generate instrumental (ElevenLabs Music API)
+        env:
+          MUSIC_PROMPT: ${{ inputs.music_prompt }}
+          MUSIC_LEN: ${{ inputs.music_length_ms }}
+        run: |
+          set -euo pipefail
+          body="$(jq -n --arg p "$MUSIC_PROMPT" --argjson len "$MUSIC_LEN" \
+            '{prompt:$p, music_length_ms:$len, force_instrumental:true}')"
+          code="$(curl -sS -w '%{http_code}' -o music.mp3 -X POST "https://api.elevenlabs.io/v1/music" \
+            -H "xi-api-key: $ELEVENLABS_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$body")"
+          if [ "$code" != "200" ]; then
+            echo "::error::ElevenLabs Music API returned HTTP $code"
+            head -c 800 music.mp3 || true; echo
+            exit 1
+          fi
+          bytes=$(stat -c%s music.mp3)
+          echo "✅ Music generated: ${bytes} bytes"
+          if [ "$bytes" -lt 2000 ]; then echo "::error::Music file suspiciously small"; exit 1; fi
+
+      - name: Download source clip
+        env:
+          VIDEO_URL: ${{ inputs.video_url }}
+        run: |
+          set -euo pipefail
+          curl -sSL "$VIDEO_URL" -o clip.mp4
+          echo "✅ Clip: $(stat -c%s clip.mp4) bytes"
+          ffprobe -v error -show_entries format=duration -of csv=p=0 clip.mp4
+
+      - name: Mux music under the looped clip (strip original SFX)
+        env:
+          LOOPS: ${{ inputs.loops }}
+        run: |
+          set -euo pipefail
+          repeat=$(( LOOPS - 1 ))
+          # Loop the clip visually, drop its generated SFX.
+          ffmpeg -y -stream_loop "$repeat" -i clip.mp4 -an \
+            -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p looped.mp4
+          dur="$(ffprobe -v error -show_entries format=duration -of csv=p=0 looped.mp4)"
+          fade="$(awk "BEGIN{d=${dur}-1.5; print (d<0)?0:d}")"
+          echo "Looped duration ${dur}s, fade-out at ${fade}s"
+          # Video from the loop, audio from the track, gentle fade-out, web-optimised.
+          ffmpeg -y -i looped.mp4 -i music.mp3 \
+            -map 0:v:0 -map 1:a:0 \
+            -c:v copy -c:a aac -b:a 192k \
+            -af "afade=t=out:st=${fade}:d=1.5" \
+            -shortest -movflags +faststart hero.mp4
+          # Poster still (~0.5s in) for the reduced-motion fallback.
+          ffmpeg -y -ss 0.5 -i clip.mp4 -frames:v 1 -q:v 3 hero-poster.jpg
+          echo "✅ hero.mp4 $(stat -c%s hero.mp4) bytes · poster $(stat -c%s hero-poster.jpg) bytes"
+
+      - name: Upload to R2 (bushi-generated)
+        env:
+          R2_KEY: ${{ inputs.r2_key }}
+        run: |
+          set -euo pipefail
+          poster_key="${R2_KEY%.*}-poster.jpg"
+          npx --yes wrangler@4 r2 object put "bushi-generated/${R2_KEY}" \
+            --file=hero.mp4 --content-type=video/mp4 --remote
+          npx --yes wrangler@4 r2 object put "bushi-generated/${poster_key}" \
+            --file=hero-poster.jpg --content-type=image/jpeg --remote
+          echo "POSTER_KEY=$poster_key" >> "$GITHUB_ENV"
+          echo "✅ Uploaded ${R2_KEY} and ${poster_key} to R2 bucket bushi-generated"
+
+      - name: Upload artifacts (fallback copies)
+        uses: actions/upload-artifact@v4
+        with:
+          name: hero-video
+          path: |
+            hero.mp4
+            hero-poster.jpg
+            music.mp3
+
+      - name: Summary
+        env:
+          R2_KEY: ${{ inputs.r2_key }}
+          API_BASE: ${{ vars.VITE_API_BASE }}
+        run: |
+          {
+            echo "### Hero video built ✅"
+            echo ""
+            echo "Uploaded to R2 bucket \`bushi-generated\`:"
+            echo "- \`${R2_KEY}\`"
+            echo "- \`${POSTER_KEY}\`"
+            echo ""
+            if [ -n "${API_BASE:-}" ]; then
+              base="${API_BASE%/}"
+              echo "**Public URLs (served by the Worker /media route):**"
+              echo "- Video: \`${base}/media/${R2_KEY}\`"
+              echo "- Poster: \`${base}/media/${POSTER_KEY}\`"
+              echo ""
+              echo "Set repo **Variables** \`VITE_HERO_VIDEO_URL\` and \`VITE_HERO_VIDEO_POSTER\` to those, then re-run Deploy."
+            else
+              echo "_Set the \`VITE_API_BASE\` repo Variable to your Worker URL to get the public /media URLs._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

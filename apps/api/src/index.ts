@@ -18,6 +18,7 @@ import { billingRoutes } from './routes/billing.js';
 import { aiRoutes } from './routes/ai.js';
 import { adminRoutes } from './routes/admin.js';
 import { crmRoutes } from './routes/crm.js';
+import { mediaRoutes } from './routes/media.js';
 import { recomputeAllHealth } from './lib/health.js';
 
 export { MatRoom } from './do/MatRoom.js';
@@ -41,6 +42,7 @@ app.route('/api/billing', billingRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/admin', adminRoutes);
 app.route('/api/admin/crm', crmRoutes);
+app.route('/media', mediaRoutes);
 
 app.onError((err, c) => {
   if (err instanceof HttpError) {
