@@ -71,6 +71,13 @@ jobs:
             exit 1
           fi
 
+      - name: Install ffmpeg (not present on the runner image)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
       - name: Generate instrumental (ElevenLabs Music API)
         env:
           MUSIC_PROMPT: ${{ inputs.music_prompt }}
