@@ -10,6 +10,27 @@ frontend, infra/deploy/data). Grouped by severity. Check items off as they're cl
 > or creates R2 buckets), and **monetization/comms** (Stripe + email are partially
 > wired or stubbed). Fix the blockers below before opening the doors.
 
+## ✅ Status — hardening pass (addressed in code)
+
+All **8 blockers** and all **High** items are fixed, plus the medium security items:
+
+- **B1–B8**: org-scoped authorization + resource ownership; authenticated live
+  scoring (server-resolved role); deploy now migrates D1 + creates R2 + ships prod
+  vars; real Stripe (checkout/portal/verified webhooks/price-id mapping); one-time
+  admin bootstrap; `RequireAuth` guard on app/admin routes.
+- **H1–H6**: strict CORS allowlist; registration endpoints authed; native email
+  wired + functional password reset; public pages fetch-by-slug + 404; create-
+  tournament POST + reset UI; `VITE_API_BASE` required at build.
+- **M1/M2/M3**: KV rate limiting (login/signup/reset/discover-web/AI); functional
+  reset flow; signup throttled. **Low**: PBKDF2 → 600k, session/token pruning cron,
+  OG/canonical SEO tags, a11y label.
+
+**Deferred (safe; degrade gracefully) →** see `launch-runbook.md` "Known deferred
+items": semantic Vectorize search, marketing Workflows / rendered assets / Bitoku,
+some in-app pages still on demo data (behind auth), unused `SESSION_SECRET`.
+
+The remaining checklist below is the original finding detail, kept for reference.
+
 ---
 
 ## 🔴 BLOCKERS — must fix before launch

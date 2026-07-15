@@ -76,6 +76,7 @@ export default {
       Promise.allSettled([
         ingestAll(env).then((r) => console.log('Discovery run:', r)),
         recomputeAllHealth(env).then((r) => console.log('Health recompute:', r)),
+        pruneExpired(env),
       ]).then((results) => {
         for (const r of results) if (r.status === 'rejected') console.error('Scheduled task failed:', r.reason);
       }),
@@ -96,6 +97,14 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env, JobMessage>;
+
+/** Housekeeping: drop expired/revoked sessions and spent reset tokens. */
+async function pruneExpired(env: Env): Promise<void> {
+  const db = new Db(env.DB);
+  const cutoff = Date.now();
+  await db.run(`DELETE FROM sessions WHERE expires_at < ? OR revoked_at IS NOT NULL`, cutoff);
+  await db.run(`DELETE FROM password_reset_tokens WHERE expires_at < ? OR used_at IS NOT NULL`, cutoff);
+}
 
 async function handleJob(job: JobMessage, db: Db, env: Env): Promise<void> {
   switch (job.kind) {

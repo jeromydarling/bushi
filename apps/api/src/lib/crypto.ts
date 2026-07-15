@@ -3,7 +3,10 @@
  * password hashing (PBKDF2) and opaque session/invite tokens.
  */
 
-const ITERATIONS = 100_000;
+// OWASP-recommended floor for PBKDF2-HMAC-SHA256. Stored hashes are
+// self-describing (they embed their own iteration count), so older 100k hashes
+// still verify and are transparently acceptable until the user next logs in.
+const ITERATIONS = 600_000;
 const enc = new TextEncoder();
 
 function toB64(bytes: Uint8Array): string {
