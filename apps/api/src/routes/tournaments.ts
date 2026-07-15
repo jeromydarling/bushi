@@ -9,7 +9,7 @@ import { Db, now, type DivisionRow, type TournamentRow } from '@bushi/db';
 import type { AppBindings } from '../types.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { uuid } from '../lib/crypto.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, assertOrgAccess } from '../middleware/auth.js';
 
 export const tournamentRoutes = new Hono<AppBindings>();
 
@@ -26,6 +26,9 @@ tournamentRoutes.get('/', requireAuth, async (c) => {
 
 tournamentRoutes.post('/', requireAuth, async (c) => {
   const body = await parseBody(c, createTournamentSchema);
+  const auth = c.get('auth')!;
+  // Only owners/organizers of the target org may create under it.
+  assertOrgAccess(auth, body.organizationId, 'owner', 'organizer');
   const db = new Db(c.env.DB);
   const ts = now();
   const id = uuid();
@@ -54,12 +57,14 @@ tournamentRoutes.post('/', requireAuth, async (c) => {
 });
 
 tournamentRoutes.get('/:id', requireAuth, async (c) => {
+  const auth = c.get('auth')!;
   const db = new Db(c.env.DB);
   const tournament = await db.first<TournamentRow>(
     `SELECT * FROM tournaments WHERE id = ? AND deleted_at IS NULL`,
     c.req.param('id'),
   );
   if (!tournament) throw new HttpError(404, 'Tournament not found');
+  assertOrgAccess(auth, tournament.org_id);
   const divisions = await db.all<DivisionRow>(
     `SELECT * FROM divisions WHERE tournament_id = ? ORDER BY created_at`,
     tournament.id,
@@ -69,15 +74,21 @@ tournamentRoutes.get('/:id', requireAuth, async (c) => {
 
 tournamentRoutes.patch('/:id/status', requireAuth, async (c) => {
   const body = await parseBody(c, updateTournamentStatusSchema);
+  const auth = c.get('auth')!;
   const db = new Db(c.env.DB);
-  const res = await db.run(
+  const tournament = await db.first<TournamentRow>(
+    `SELECT * FROM tournaments WHERE id = ? AND deleted_at IS NULL`,
+    c.req.param('id'),
+  );
+  if (!tournament) throw new HttpError(404, 'Tournament not found');
+  assertOrgAccess(auth, tournament.org_id, 'owner', 'organizer');
+  await db.run(
     `UPDATE tournaments SET status = ?, is_public = ?, updated_at = ? WHERE id = ?`,
     body.status,
     body.status === 'draft' ? 0 : 1,
     now(),
-    c.req.param('id'),
+    tournament.id,
   );
-  if (!res.meta.changes) throw new HttpError(404, 'Tournament not found');
   return c.json({ ok: true, status: body.status });
 });
 
@@ -85,7 +96,14 @@ tournamentRoutes.patch('/:id/status', requireAuth, async (c) => {
 
 tournamentRoutes.post('/:id/divisions', requireAuth, async (c) => {
   const body = await parseBody(c, createDivisionSchema);
+  const auth = c.get('auth')!;
   const db = new Db(c.env.DB);
+  const tournament = await db.first<TournamentRow>(
+    `SELECT * FROM tournaments WHERE id = ? AND deleted_at IS NULL`,
+    c.req.param('id'),
+  );
+  if (!tournament) throw new HttpError(404, 'Tournament not found');
+  assertOrgAccess(auth, tournament.org_id, 'owner', 'organizer');
   const ts = now();
   const id = uuid();
   await db.run(
@@ -113,10 +131,16 @@ tournamentRoutes.post('/:id/divisions', requireAuth, async (c) => {
 
 // Generate (or regenerate) the bracket for a division from its checked-in entries.
 tournamentRoutes.post('/divisions/:divisionId/bracket', requireAuth, async (c) => {
+  const auth = c.get('auth')!;
   const db = new Db(c.env.DB);
   const divisionId = c.req.param('divisionId');
   const division = await db.first<DivisionRow>(`SELECT * FROM divisions WHERE id = ?`, divisionId);
   if (!division) throw new HttpError(404, 'Division not found');
+  const owner = await db.first<{ org_id: string }>(
+    `SELECT org_id FROM tournaments WHERE id = ? AND deleted_at IS NULL`,
+    division.tournament_id,
+  );
+  assertOrgAccess(auth, owner?.org_id, 'owner', 'organizer');
 
   const entries = await db.all<{ athlete_id: string; seed: number | null; first_name: string; last_name: string; school_id: string | null }>(
     `SELECT e.athlete_id, e.seed, a.first_name, a.last_name, a.school_id

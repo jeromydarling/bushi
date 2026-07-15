@@ -72,6 +72,10 @@ export type JobMessage =
 export interface AuthContext {
   userId: string;
   email: string;
+  /** Per-org role grants — the source of truth for authorization. */
+  memberships: Array<{ orgId: string; role: string }>;
+  /** Flattened roles across all orgs — use only for platform-level checks. */
   roles: string[];
+  /** Convenience "primary" org (first membership); NOT an authorization scope. */
   orgId: string | null;
 }

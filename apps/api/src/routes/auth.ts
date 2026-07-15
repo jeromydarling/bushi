@@ -123,10 +123,15 @@ async function createSession(db: Db, userId: string, userAgent: string | null): 
 }
 
 function setSessionCookie(c: Context<AppBindings>, token: string): void {
+  // The SPA (Pages) and API (Worker) are on different origins in production, so
+  // the session cookie must be SameSite=None to ride cross-origin credentialed
+  // requests (and WebSocket handshakes). CORS is locked to an allowlist, and the
+  // cookie is httpOnly+Secure, so this doesn't reopen CSRF. Dev stays Lax.
+  const crossSite = c.env.ENVIRONMENT === 'production';
   setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
     secure: true,
-    sameSite: 'Lax',
+    sameSite: crossSite ? 'None' : 'Lax',
     path: '/',
     maxAge: SESSION_TTL_MS / 1000,
   });

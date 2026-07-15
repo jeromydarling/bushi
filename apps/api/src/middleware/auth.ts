@@ -40,6 +40,7 @@ export async function loadSession(
       auth = {
         userId: row.user_id,
         email: row.email,
+        memberships: memberships.map((m) => ({ orgId: m.org_id, role: m.role })),
         roles: memberships.map((m) => m.role),
         orgId: memberships[0]?.org_id ?? null,
       };
@@ -76,4 +77,37 @@ function bearer(header: string | undefined): string | undefined {
   if (!header) return undefined;
   const [scheme, value] = header.split(' ');
   return scheme === 'Bearer' ? value : undefined;
+}
+
+// ── Org-scoped authorization helpers ─────────────────────────────────────────
+// Roles are granted per-organization. NEVER authorize a write against the flat
+// `roles` list — always check the caller's role in the specific org that owns
+// the resource, so a member of org A can't act on org B's data.
+
+/** Platform admins bypass org scoping (super-admin / CRM). */
+export function isPlatformAdmin(auth: AuthContext): boolean {
+  return auth.roles.includes('platform_admin');
+}
+
+/** The caller's role within a given org, or null if not a member. */
+export function roleInOrg(auth: AuthContext, orgId: string | null | undefined): string | null {
+  if (!orgId) return null;
+  return auth.memberships.find((m) => m.orgId === orgId)?.role ?? null;
+}
+
+/**
+ * Assert the caller may act on `orgId`. With no `roles`, any membership passes
+ * (read access); with roles, the caller's role in that org must be one of them.
+ * Platform admins always pass. Throws 403 otherwise.
+ */
+export function assertOrgAccess(
+  auth: AuthContext,
+  orgId: string | null | undefined,
+  ...roles: string[]
+): void {
+  if (isPlatformAdmin(auth)) return;
+  if (!orgId) throw new HttpError(403, 'Forbidden');
+  const role = roleInOrg(auth, orgId);
+  if (!role) throw new HttpError(403, 'Not a member of this organization');
+  if (roles.length > 0 && !roles.includes(role)) throw new HttpError(403, 'Insufficient role');
 }
