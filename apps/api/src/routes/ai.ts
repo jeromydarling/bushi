@@ -5,6 +5,7 @@ import type { AppBindings } from '../types.js';
 import { HttpError } from '../lib/http.js';
 import { uuid } from '../lib/crypto.js';
 import { requireAuth } from '../middleware/auth.js';
+import { rateLimit } from '../lib/ratelimit.js';
 
 /**
  * AI content endpoints backed by Workers AI. Every call is logged to
@@ -64,6 +65,7 @@ aiRoutes.post('/tournament/:id/promo', requireAuth, async (c) => {
 
 // Organizer assistant — a lightweight command endpoint.
 aiRoutes.post('/assistant', requireAuth, async (c) => {
+  await rateLimit(c, 'ai', c.get('auth')!.userId, 40, 3600); // 40 assistant calls / hour / user
   const { message } = await c.req.json<{ message?: string }>();
   if (!message) throw new HttpError(400, 'message is required');
   const system =

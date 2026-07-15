@@ -3,6 +3,7 @@ import { Db, type SchoolRow, type TournamentRow } from '@bushi/db';
 import type { AppBindings } from '../types.js';
 import { HttpError } from '../lib/http.js';
 import { ingestQuery } from '../lib/discovery.js';
+import { clientIp, rateLimit } from '../lib/ratelimit.js';
 
 /** Unauthenticated, cacheable, SEO-facing endpoints. */
 export const publicRoutes = new Hono<AppBindings>();
@@ -128,6 +129,9 @@ publicRoutes.get('/discover/web', async (c) => {
 
   const cached = await c.env.CACHE.get(cacheKey);
   if (cached) return c.json({ results: JSON.parse(cached), cached: true });
+
+  // Cache miss → a paid Perplexity call follows. Rate-limit per IP to bound cost.
+  await rateLimit(c, 'discweb', clientIp(c), 15, 3600); // 15 uncached web searches / hour / IP
 
   const query = `Upcoming martial arts tournaments matching "${q}" in the next 6 months, with dates, city, country, styles, organizer, and official registration links.`;
   const outcome = await ingestQuery(c.env, query, 'on_demand');

@@ -7,6 +7,7 @@ import type { AppBindings } from '../types.js';
 import { generateToken, hashPassword, hashToken, timingSafeEqual, uuid, verifyPassword } from '../lib/crypto.js';
 import { HttpError, SESSION_COOKIE, parseBody } from '../lib/http.js';
 import { requireAuth } from '../middleware/auth.js';
+import { clientIp, rateLimit } from '../lib/ratelimit.js';
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 const RESET_TTL_MS = 1000 * 60 * 60; // 1 hour
@@ -14,6 +15,7 @@ const RESET_TTL_MS = 1000 * 60 * 60; // 1 hour
 export const authRoutes = new Hono<AppBindings>();
 
 authRoutes.post('/signup', async (c) => {
+  await rateLimit(c, 'signup', clientIp(c), 10, 3600); // 10 new accounts / hour / IP
   const body = await parseBody(c, signupSchema);
   const db = new Db(c.env.DB);
   const existing = await db.first<UserRow>(
@@ -60,6 +62,7 @@ authRoutes.post('/signup', async (c) => {
 });
 
 authRoutes.post('/login', async (c) => {
+  await rateLimit(c, 'login', clientIp(c), 15, 60); // 15 attempts / minute / IP
   const body = await parseBody(c, loginSchema);
   const db = new Db(c.env.DB);
   const user = await db.first<UserRow>(
@@ -99,6 +102,7 @@ authRoutes.get('/me', requireAuth, async (c) => {
 
 // --- request a password reset: persist a hashed token and email the link ---
 authRoutes.post('/password/reset-request', async (c) => {
+  await rateLimit(c, 'reset', clientIp(c), 10, 3600); // 10 reset requests / hour / IP
   const { email } = await c.req.json<{ email?: string }>();
   if (email) {
     const db = new Db(c.env.DB);
