@@ -110,6 +110,13 @@ jobs:
           pnpm exec wrangler deploy "${args[@]}"
 
       # --- Build + deploy the web app to Cloudflare Pages ---
+      - name: Require VITE_API_BASE
+        run: |
+          if [ -z "${{ vars.VITE_API_BASE }}" ]; then
+            echo "::error::Repository variable VITE_API_BASE is required (Settings → Secrets and variables → Actions → Variables). Set it to your Worker URL (e.g. https://bushi.<sub>.workers.dev) so the SPA can reach the API."
+            exit 1
+          fi
+
       - name: Build web
         run: pnpm --filter @bushi/web build
         env:

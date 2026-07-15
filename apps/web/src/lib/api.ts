@@ -5,6 +5,12 @@
  */
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
 
+/**
+ * Whether a live backend is configured. When false the app runs in demo mode
+ * (no auth guard, demo data), so the marketing/demo experience still works.
+ */
+export const API_CONFIGURED = Boolean(import.meta.env.VITE_API_BASE);
+
 export const WS_BASE = (() => {
   if (import.meta.env.VITE_API_BASE) {
     return (import.meta.env.VITE_API_BASE as string).replace(/^http/, 'ws');
@@ -43,10 +49,29 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  me: () => request<{ id: string; email: string; roles: string[] }>('/api/auth/me'),
+  me: () => request<{ id: string; email: string; roles: string[]; orgId: string | null }>('/api/auth/me'),
+  requestPasswordReset: (email: string) =>
+    request<{ ok: boolean }>('/api/auth/password/reset-request', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token: string, password: string) =>
+    request<{ ok: boolean }>('/api/auth/password/reset', { method: 'POST', body: JSON.stringify({ token, password }) }),
   createTournament: (body: unknown) =>
-    request<{ tournament: unknown }>('/api/tournaments', { method: 'POST', body: JSON.stringify(body) }),
+    request<{ tournament: { id: string; slug: string } | null }>('/api/tournaments', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   discover: (params: string) => request<{ results: DiscoverItem[] }>(`/api/public/discover?${params}`),
+  publicTournament: (slug: string) =>
+    request<{ tournament: PublicTournamentRow; divisions: PublicDivisionRow[]; sponsors: PublicSponsorRow[] }>(
+      `/api/public/tournaments/${encodeURIComponent(slug)}`,
+    ),
+  publicResults: (slug: string) =>
+    request<{ tournament: PublicTournamentRow; brackets: unknown[]; matches: PublicMatchRow[] }>(
+      `/api/public/tournaments/${encodeURIComponent(slug)}/results`,
+    ),
+  publicSchool: (slug: string) =>
+    request<{ school: PublicSchoolRow; profile: unknown; athletes: PublicAthleteRow[]; rankings: PublicRankingRow[] }>(
+      `/api/public/schools/${encodeURIComponent(slug)}`,
+    ),
   discoverWeb: (q: string) => request<{ results: DiscoverItem[]; found?: number }>(`/api/public/discover/web?q=${encodeURIComponent(q)}`),
   discoveryRefresh: () =>
     request<{ ok: boolean; found: number; inserted: number; updated: number }>('/api/admin/discovery/refresh', { method: 'POST' }),
@@ -226,6 +251,67 @@ export interface DiscoveryRun {
   status: string;
   error: string | null;
   created_at: number;
+}
+
+// ── Public page row shapes (as returned by /api/public/*) ─────────────────────
+export interface PublicTournamentRow {
+  id: string;
+  name: string;
+  slug: string;
+  styles: string; // JSON array string
+  status: string;
+  start_date: string;
+  end_date: string | null;
+  venue_name: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+}
+export interface PublicDivisionRow {
+  id: string;
+  name: string;
+  style: string;
+  format: string;
+  status: string;
+}
+export interface PublicSponsorRow {
+  name: string;
+  tier: string | null;
+  logo_url: string | null;
+  website: string | null;
+}
+export interface PublicMatchRow {
+  id: string;
+  division_id: string;
+  round: number;
+  ordinal: number;
+  label: string | null;
+  status: string;
+  winner_athlete_id: string | null;
+  method: string | null;
+}
+export interface PublicSchoolRow {
+  id: string;
+  name: string;
+  slug: string;
+  styles: string;
+  bio: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+}
+export interface PublicAthleteRow {
+  first_name: string;
+  last_name: string;
+  primary_style: string | null;
+  belt_rank: string | null;
+}
+export interface PublicRankingRow {
+  style: string;
+  region: string | null;
+  points: number;
+  rank: number;
+  period: string | null;
 }
 
 /** Unified discovery item (Bushi-hosted or web-discovered). */

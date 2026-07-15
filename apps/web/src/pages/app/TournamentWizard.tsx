@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MARTIAL_ARTS_STYLES, STYLE_LABELS, slugify, type MartialArtStyle } from '@bushi/domain';
 import { Button, Card } from '../../components/ui.js';
+import { api, API_CONFIGURED } from '../../lib/api.js';
 import { cn } from '../../lib/cn.js';
 import { useSeo } from '../../lib/seo.js';
 
@@ -18,8 +19,36 @@ export function TournamentWizard() {
   const [startDate, setStartDate] = useState('');
   const [mats, setMats] = useState(4);
   const [divisions, setDivisions] = useState<string[]>(['Adult Black -76kg', 'Junior -57kg']);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const canNext = [name.trim().length > 2, styles.length > 0, startDate !== '', mats > 0, divisions.length > 0, true][step];
+
+  async function create() {
+    setError(null);
+    // Demo mode (no backend): jump straight into the console.
+    if (!API_CONFIGURED) return navigate('/app');
+    setCreating(true);
+    const me = await api.me();
+    if (!me.ok || !me.data.orgId) {
+      setCreating(false);
+      return setError('Please sign in again to create a tournament.');
+    }
+    const res = await api.createTournament({
+      organizationId: me.data.orgId,
+      name,
+      slug: slugify(name),
+      styles,
+      startDate,
+      city: city || undefined,
+    });
+    setCreating(false);
+    if (res.ok) {
+      navigate(res.data.tournament?.id ? `/app/tournaments/${res.data.tournament.id}` : '/app');
+    } else {
+      setError(res.error);
+    }
+  }
 
   function toggleStyle(s: MartialArtStyle) {
     setStyles((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
@@ -141,9 +170,12 @@ export function TournamentWizard() {
               Continue
             </Button>
           ) : (
-            <Button onClick={() => navigate('/app/tournaments/tour-summer')}>Create tournament</Button>
+            <Button onClick={create} disabled={creating}>
+              {creating ? 'Creating…' : 'Create tournament'}
+            </Button>
           )}
         </div>
+        {error && <p className="mt-3 rounded-lg bg-kiai-500/10 px-3 py-2 text-sm text-kiai-300">{error}</p>}
       </Card>
     </div>
   );

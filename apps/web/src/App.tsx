@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { MarketingLayout } from './layouts/MarketingLayout.js';
 import { AppLayout } from './layouts/AppLayout.js';
 import { PublicLayout } from './layouts/PublicLayout.js';
+import { RequireAuth } from './components/RequireAuth.js';
 import { Home } from './pages/Home.js';
 import { Features } from './pages/Features.js';
 import { Compare } from './pages/Compare.js';
@@ -43,8 +44,8 @@ export function App() {
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
 
-        {/* App shell */}
-        <Route path="/app" element={<AppLayout />}>
+        {/* App shell (auth-guarded) */}
+        <Route path="/app" element={<RequireAuth><AppLayout /></RequireAuth>}>
           <Route index element={<Dashboard />} />
           <Route path="tournaments/new" element={<TournamentWizard />} />
           <Route path="tournaments/:id" element={<TournamentDetail />} />
@@ -52,12 +53,12 @@ export function App() {
           <Route path="schools/:id" element={<SchoolDetail />} />
           <Route path="coach" element={<Coach />} />
         </Route>
-        {/* Mat room is full-bleed (own chrome) */}
+        {/* Mat room is full-bleed (own chrome); scoring is enforced server-side */}
         <Route path="/app/tournaments/:id/mat/:mat" element={<MatRoom />} />
-        <Route path="/admin" element={<Admin />} />
+        <Route path="/admin" element={<RequireAuth role="platform_admin"><Admin /></RequireAuth>} />
 
         {/* Super-admin CRM */}
-        <Route path="/admin/crm" element={<CrmLayout />}>
+        <Route path="/admin/crm" element={<RequireAuth role="platform_admin"><CrmLayout /></RequireAuth>}>
           <Route index element={<CrmOverview />} />
           <Route path="customers" element={<CrmCustomers />} />
           <Route path="customers/:id" element={<CrmCustomerProfile />} />
