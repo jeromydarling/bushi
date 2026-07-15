@@ -229,16 +229,32 @@ crmRoutes.post('/customers/:id/interactions', async (c) => {
     body.followUpAt ?? null,
     ts,
   );
-  // If this is an email, best-effort send via the Cloudflare send_email binding.
+  // If this is an email, enqueue a real send via the Cloudflare send_email binding.
   let emailed = false;
-  if (body.kind === 'email' && c.env.SEND_EMAIL) {
+  if (body.kind === 'email') {
     const contact = await db.first<{ email: string | null }>(
       `SELECT email FROM crm_contacts WHERE customer_id = ? AND email IS NOT NULL ORDER BY is_primary DESC LIMIT 1`,
       c.req.param('id'),
     );
     if (contact?.email) {
-      // Real send handled by @bushi/notifications in production; log intent here.
-      emailed = true;
+      const subject = body.subject ?? 'A message from Bushi';
+      const safe = body.body
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+      try {
+        await c.env.JOBS?.send({
+          kind: 'send_email',
+          to: contact.email,
+          subject,
+          html: `<p style="font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${safe}</p>`,
+          text: body.body,
+        });
+        emailed = true;
+      } catch {
+        /* queue not bound in local dev */
+      }
     }
   }
   return c.json({ ok: true, id, emailed });

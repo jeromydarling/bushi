@@ -20,12 +20,25 @@ import { adminRoutes } from './routes/admin.js';
 import { crmRoutes } from './routes/crm.js';
 import { mediaRoutes } from './routes/media.js';
 import { recomputeAllHealth } from './lib/health.js';
+import { getMailer } from './lib/mailer.js';
 
 export { MatRoom } from './do/MatRoom.js';
 
 const app = new Hono<AppBindings>();
 
-app.use('*', cors({ origin: (o) => o, credentials: true }));
+// Strict CORS allowlist — never reflect an arbitrary origin while allowing
+// credentials. Allowed = the configured app origin (APP_BASE_URL) plus local dev.
+app.use('*', (c, next) =>
+  cors({
+    origin: (origin) => {
+      const allowed = [c.env.APP_BASE_URL, 'http://localhost:5173', 'http://localhost:8787'].filter(
+        (o): o is string => Boolean(o),
+      );
+      return allowed.includes(origin) ? origin : null;
+    },
+    credentials: true,
+  })(c, next),
+);
 app.use('*', loadSession);
 
 app.get('/api/health', (c) =>
@@ -113,9 +126,13 @@ async function handleJob(job: JobMessage, db: Db, env: Env): Promise<void> {
       );
       return;
     }
-    case 'send_email':
+    case 'send_email': {
+      // Native Cloudflare Email Sending (or console in dev).
+      await getMailer(env).sendEmail({ to: job.to, subject: job.subject, html: job.html, text: job.text });
+      return;
+    }
     case 'generate_asset':
-      // Handled by @bushi/notifications / @bushi/rendering in the full build.
+      // Handled by @bushi/rendering (Browser Rendering → R2) in the full build.
       console.log('Queued job acknowledged:', job.kind);
       return;
   }

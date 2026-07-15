@@ -29,6 +29,12 @@ importers:
       '@bushi/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@bushi/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
+      '@bushi/payments':
+        specifier: workspace:*
+        version: link:../../packages/payments
       hono:
         specifier: ^4.6.14
         version: 4.12.27

@@ -49,7 +49,12 @@ export interface Env {
   SESSION_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  // Stripe Price IDs (price_...) per paid tier — set as vars/secrets for live billing.
+  STRIPE_PRICE_STARTER?: string;
+  STRIPE_PRICE_PRO?: string;
   PERPLEXITY_API_KEY?: string;
+  // One-time admin bootstrap token (see routes/admin bootstrap).
+  ADMIN_BOOTSTRAP_TOKEN?: string;
 }
 
 /**
@@ -63,7 +68,7 @@ export interface SendEmailBinding {
 
 /** Messages placed on the JOBS queue for async fan-out. */
 export type JobMessage =
-  | { kind: 'send_email'; to: string; template: string; data: Record<string, unknown> }
+  | { kind: 'send_email'; to: string; subject: string; html: string; text?: string }
   | { kind: 'generate_asset'; assetKind: string; tournamentId: string; prompt?: string }
   | { kind: 'index_entity'; entityType: string; entityId: string }
   | { kind: 'persist_match_result'; matchId: string; winnerAthleteId: string; method: string };

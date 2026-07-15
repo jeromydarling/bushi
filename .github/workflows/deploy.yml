@@ -14,6 +14,9 @@ name: Deploy to Cloudflare
 #                            produced by the hero-video.yml workflow). Unset = no hero band.
 #   VITE_HERO_VIDEO_POSTER — poster still for the hero (reduced-motion fallback).
 #   VITE_MAPBOX_TOKEN      — Mapbox token for the super-admin CRM customer map.
+#   APP_BASE_URL           — the production site origin (e.g. https://bushi-web.pages.dev
+#                            or your custom domain). Injected as a Worker var so billing
+#                            success/cancel URLs and share links are correct in prod.
 
 on:
   # Deploys always run from main. Use "Run workflow" (workflow_dispatch) to
@@ -81,10 +84,30 @@ jobs:
         continue-on-error: true
         run: pnpm exec wrangler queues create bushi-jobs
 
+      - name: Ensure R2 buckets exist
+        working-directory: apps/api
+        continue-on-error: true
+        run: |
+          pnpm exec wrangler r2 bucket create bushi-assets || true
+          pnpm exec wrangler r2 bucket create bushi-generated || true
+
+      # --- Apply D1 migrations to the remote DB (0001..NNNN) before serving ---
+      - name: Apply D1 migrations (remote)
+        working-directory: apps/api
+        run: pnpm exec wrangler d1 migrations apply bushi-db --remote
+
       # --- Deploy the Worker (binds D1/KV/R2/DO/Queue/Vectorize/AI/Browser) ---
+      # Override the committed dev vars with production values at deploy time.
       - name: Deploy Worker
         working-directory: apps/api
-        run: pnpm exec wrangler deploy
+        env:
+          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+        run: |
+          args=(--var ENVIRONMENT:production)
+          if [ -n "${APP_BASE_URL}" ]; then
+            args+=(--var "APP_BASE_URL:${APP_BASE_URL}")
+          fi
+          pnpm exec wrangler deploy "${args[@]}"
 
       # --- Build + deploy the web app to Cloudflare Pages ---
       - name: Build web

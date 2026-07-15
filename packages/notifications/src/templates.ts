@@ -65,6 +65,23 @@ ${button('Open your dashboard', v.ctaUrl)}`,
   return { subject, html, text };
 }
 
+export interface PasswordResetVars {
+  name: string;
+  resetUrl: string;
+}
+export function passwordResetEmail(v: PasswordResetVars): RenderedEmail {
+  const subject = 'Reset your Bushi password';
+  const html = layout(
+    subject,
+    `<h1 style="font-size:22px;margin:0 0 16px;">Reset your password</h1>
+${para(`Hi ${v.name}, we received a request to reset your Bushi password.`)}
+${para('Choose a new password with the button below. This link expires in 1 hour. If you didn’t request this, you can safely ignore this email.')}
+${button('Reset password', v.resetUrl)}`,
+  );
+  const text = `Reset your Bushi password: ${v.resetUrl} (this link expires in 1 hour). If you didn't request it, ignore this email.`;
+  return { subject, html, text };
+}
+
 export interface InviteVars {
   inviterName: string;
   organizationName: string;

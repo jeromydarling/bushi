@@ -2,24 +2,64 @@ import { Hono } from 'hono';
 import { registrationSchema } from '@bushi/domain';
 import { Db, now } from '@bushi/db';
 import type { AppBindings } from '../types.js';
+import type { AuthContext } from '../env.js';
 import { HttpError, parseBody } from '../lib/http.js';
 import { uuid } from '../lib/crypto.js';
+import { requireAuth, assertOrgAccess, isPlatformAdmin, roleInOrg } from '../middleware/auth.js';
 
 export const registrationRoutes = new Hono<AppBindings>();
 
 const ENTRY_FEE_CENTS = 6500;
 
-// Public self/school registration for a tournament.
-registrationRoutes.post('/', async (c) => {
+/** The caller may register an athlete only if they manage its school. */
+async function assertAthleteSchoolAccess(db: Db, auth: AuthContext, schoolId: string | null): Promise<void> {
+  if (isPlatformAdmin(auth)) return;
+  if (!schoolId) throw new HttpError(403, 'This athlete is not attached to a school you manage');
+  const school = await db.first<{ org_id: string | null; claimed_by: string | null }>(
+    `SELECT org_id, claimed_by FROM schools WHERE id = ? AND deleted_at IS NULL`,
+    schoolId,
+  );
+  if (!school) throw new HttpError(404, 'School not found');
+  if (school.org_id && roleInOrg(auth, school.org_id)) return;
+  if (school.claimed_by && school.claimed_by === auth.userId) return;
+  throw new HttpError(403, 'You do not manage this athlete');
+}
+
+// Registration for a tournament — authenticated; caller must manage the athlete.
+registrationRoutes.post('/', requireAuth, async (c) => {
   const body = await parseBody(c, registrationSchema);
+  const auth = c.get('auth')!;
   const db = new Db(c.env.DB);
   const ts = now();
 
-  // Enforce division caps / waitlist.
+  // Tournament must exist, be public, and still be open for registration.
+  const tournament = await db.first<{ id: string; is_public: number; status: string }>(
+    `SELECT id, is_public, status FROM tournaments WHERE id = ? AND deleted_at IS NULL`,
+    body.tournamentId,
+  );
+  if (!tournament) throw new HttpError(404, 'Tournament not found');
+  const closed = tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'archived';
+  if (!tournament.is_public || closed) throw new HttpError(400, 'Registration is not open for this tournament');
+
+  // The athlete must belong to a school the caller manages.
+  const athlete = await db.first<{ id: string; school_id: string | null }>(
+    `SELECT id, school_id FROM athletes WHERE id = ? AND deleted_at IS NULL`,
+    body.athleteId,
+  );
+  if (!athlete) throw new HttpError(404, 'Athlete not found');
+  await assertAthleteSchoolAccess(db, auth, athlete.school_id);
+
+  // Enforce division caps / waitlist — and that each division belongs to this tournament.
   let waitlisted = false;
   for (const divisionId of body.divisionIds) {
-    const division = await db.first<{ cap: number | null }>(`SELECT cap FROM divisions WHERE id = ?`, divisionId);
+    const division = await db.first<{ cap: number | null; tournament_id: string }>(
+      `SELECT cap, tournament_id FROM divisions WHERE id = ?`,
+      divisionId,
+    );
     if (!division) throw new HttpError(404, `Division ${divisionId} not found`);
+    if (division.tournament_id !== body.tournamentId) {
+      throw new HttpError(400, 'Division does not belong to this tournament');
+    }
     if (division.cap != null) {
       const count = await db.first<{ n: number }>(
         `SELECT COUNT(*) AS n FROM division_entries WHERE division_id = ? AND status != 'withdrawn'`,
@@ -51,7 +91,7 @@ registrationRoutes.post('/', async (c) => {
       sql: `INSERT INTO division_entries (id,division_id,athlete_id,status,created_at,updated_at)
             VALUES (?,?,?,?,?,?)
             ON CONFLICT(division_id, athlete_id) DO NOTHING`,
-      params: [uuid(), divisionId, body.athleteId, waitlisted ? 'registered' : 'registered', ts, ts],
+      params: [uuid(), divisionId, body.athleteId, 'registered', ts, ts],
     });
   }
   await db.batch(statements);
@@ -59,8 +99,16 @@ registrationRoutes.post('/', async (c) => {
   return c.json({ registrationId, status: waitlisted ? 'waitlisted' : 'awaiting_payment', amountCents: amount }, 201);
 });
 
-registrationRoutes.get('/tournament/:tournamentId', async (c) => {
+// Registrant roster (PII) — restricted to organizers of the tournament's org.
+registrationRoutes.get('/tournament/:tournamentId', requireAuth, async (c) => {
+  const auth = c.get('auth')!;
   const db = new Db(c.env.DB);
+  const tournament = await db.first<{ org_id: string }>(
+    `SELECT org_id FROM tournaments WHERE id = ? AND deleted_at IS NULL`,
+    c.req.param('tournamentId'),
+  );
+  if (!tournament) throw new HttpError(404, 'Tournament not found');
+  assertOrgAccess(auth, tournament.org_id, 'owner', 'organizer');
   const rows = await db.all<Record<string, unknown>>(
     `SELECT r.id, r.status, r.amount_cents, a.first_name, a.last_name, s.name AS school
      FROM registrations r
