@@ -82,6 +82,41 @@ ${button('Reset password', v.resetUrl)}`,
   return { subject, html, text };
 }
 
+export interface PasswordChangedVars {
+  name: string;
+  supportUrl: string;
+}
+export function passwordChangedEmail(v: PasswordChangedVars): RenderedEmail {
+  const subject = 'Your Bushi password was changed';
+  const html = layout(
+    subject,
+    `<h1 style="font-size:22px;margin:0 0 16px;">Password changed</h1>
+${para(`Hi ${v.name}, your Bushi password was just changed and all other sessions were signed out.`)}
+${para('If this was you, no action is needed. If it wasn’t, reset your password immediately and contact support.')}
+${button('Contact support', v.supportUrl)}`,
+  );
+  const text = `Your Bushi password was changed. If this wasn't you, reset it immediately and contact support: ${v.supportUrl}`;
+  return { subject, html, text };
+}
+
+export interface BillingNoticeVars {
+  status: 'past_due' | 'canceled';
+  manageUrl: string;
+}
+export function billingNoticeEmail(v: BillingNoticeVars): RenderedEmail {
+  const isCanceled = v.status === 'canceled';
+  const subject = isCanceled ? 'Your Bushi subscription was canceled' : 'Action needed: your Bushi payment failed';
+  const heading = isCanceled ? 'Subscription canceled' : 'Payment failed';
+  const body = isCanceled
+    ? `${para('Your Bushi subscription has been canceled and your organization has moved to the free plan.')}${para('You can resubscribe anytime to restore premium features.')}${button('Resubscribe', v.manageUrl)}`
+    : `${para('We couldn’t process your latest Bushi payment. To avoid losing premium features, please update your payment method.')}${button('Update payment method', v.manageUrl)}`;
+  const html = layout(subject, `<h1 style="font-size:22px;margin:0 0 16px;">${heading}</h1>${body}`);
+  const text = isCanceled
+    ? `Your Bushi subscription was canceled. Resubscribe: ${v.manageUrl}`
+    : `Your Bushi payment failed. Update your payment method: ${v.manageUrl}`;
+  return { subject, html, text };
+}
+
 export interface InviteVars {
   inviterName: string;
   organizationName: string;

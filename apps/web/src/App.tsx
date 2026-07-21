@@ -23,6 +23,8 @@ import { TournamentDetail } from './pages/app/TournamentDetail.js';
 import { MatRoom } from './pages/app/MatRoom.js';
 import { Schools, SchoolDetail } from './pages/app/Schools.js';
 import { Coach } from './pages/app/Coach.js';
+import { Team } from './pages/app/Team.js';
+import { Invite } from './pages/Invite.js';
 import { PublicTournament } from './pages/public/PublicTournament.js';
 import { PublicResults } from './pages/public/PublicResults.js';
 import { PublicSchool } from './pages/public/PublicSchool.js';
@@ -43,6 +45,7 @@ export function App() {
         {/* Auth (full-bleed) */}
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
+        <Route path="/invite" element={<Invite />} />
 
         {/* App shell (auth-guarded) */}
         <Route path="/app" element={<RequireAuth><AppLayout /></RequireAuth>}>
@@ -52,6 +55,7 @@ export function App() {
           <Route path="schools" element={<Schools />} />
           <Route path="schools/:id" element={<SchoolDetail />} />
           <Route path="coach" element={<Coach />} />
+          <Route path="team" element={<Team />} />
         </Route>
         {/* Mat room is full-bleed (own chrome); scoring is enforced server-side */}
         <Route path="/app/tournaments/:id/mat/:mat" element={<MatRoom />} />

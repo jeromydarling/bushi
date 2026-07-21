@@ -59,6 +59,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  // ── Team invites ──────────────────────────────────────────────────────────
+  listInvites: (orgId: string) => request<{ invites: OrgInvite[] }>(`/api/invites?orgId=${encodeURIComponent(orgId)}`),
+  createInvite: (body: { orgId: string; email: string; role: string }) =>
+    request<{ id: string; email: string; role: string }>('/api/invites', { method: 'POST', body: JSON.stringify(body) }),
+  revokeInvite: (id: string) => request<{ ok: boolean }>(`/api/invites/${id}`, { method: 'DELETE' }),
+  acceptInvite: (token: string) =>
+    request<{ ok: boolean; orgId: string; role: string }>('/api/invites/accept', { method: 'POST', body: JSON.stringify({ token }) }),
   discover: (params: string) => request<{ results: DiscoverItem[] }>(`/api/public/discover?${params}`),
   publicTournament: (slug: string) =>
     request<{ tournament: PublicTournamentRow; divisions: PublicDivisionRow[]; sponsors: PublicSponsorRow[] }>(
@@ -250,6 +258,15 @@ export interface DiscoveryRun {
   updated: number;
   status: string;
   error: string | null;
+  created_at: number;
+}
+
+export interface OrgInvite {
+  id: string;
+  email: string;
+  role: string;
+  accepted_at: number | null;
+  expires_at: number;
   created_at: number;
 }
 

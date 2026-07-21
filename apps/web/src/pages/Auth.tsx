@@ -62,10 +62,10 @@ export function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
     const res = isSignup ? await api.signup({ email, password, fullName }) : await api.login({ email, password });
     setBusy(false);
     if (res.ok) {
-      navigate('/app');
+      navigate(params.get('next') || '/app');
     } else if (!API_CONFIGURED) {
       // Demo mode (no backend configured) — proceed to the console to explore.
-      navigate('/app');
+      navigate(params.get('next') || '/app');
     } else {
       setError(res.error);
     }

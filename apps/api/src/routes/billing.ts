@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import { SUBSCRIPTION_TIERS, type SubscriptionTier } from '@bushi/domain';
 import { Db, now, type SubscriptionRow } from '@bushi/db';
 import { StripeClient, PRICES, verifyWebhookSignature, parseWebhookEvent } from '@bushi/payments';
+import { billingNoticeEmail } from '@bushi/notifications';
 import type { AppBindings } from '../types.js';
 import { HttpError } from '../lib/http.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -157,6 +158,31 @@ billingRoutes.post('/webhook', async (c) => {
         now(),
         stripeSubId,
       );
+      // Dunning: notify the org's owner/organizer on payment failure or cancellation.
+      if (status === 'past_due' || status === 'canceled') {
+        const sub = await db.first<{ org_id: string }>(
+          `SELECT org_id FROM subscriptions WHERE stripe_subscription_id = ?`,
+          stripeSubId,
+        );
+        if (sub) {
+          const owner = await db.first<{ email: string }>(
+            `SELECT u.email FROM organization_memberships m JOIN users u ON u.id = m.user_id
+             WHERE m.org_id = ? AND m.role IN ('owner','organizer') ORDER BY m.created_at LIMIT 1`,
+            sub.org_id,
+          );
+          if (owner?.email) {
+            const mail = billingNoticeEmail({
+              status: status === 'canceled' ? 'canceled' : 'past_due',
+              manageUrl: `${c.env.APP_BASE_URL}/app`,
+            });
+            try {
+              await c.env.JOBS?.send({ kind: 'send_email', to: owner.email, subject: mail.subject, html: mail.html, text: mail.text });
+            } catch {
+              /* queue not bound in dev */
+            }
+          }
+        }
+      }
       break;
     }
   }

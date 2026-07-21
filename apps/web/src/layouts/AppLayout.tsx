@@ -9,6 +9,7 @@ const nav = [
   { to: '/app/tournaments/tour-summer', label: 'Summer Open' },
   { to: '/app/schools', label: 'Schools' },
   { to: '/app/coach', label: 'Coach' },
+  { to: '/app/team', label: 'Team' },
 ];
 
 export function AppLayout() {

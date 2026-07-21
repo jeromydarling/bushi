@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { setCookie, deleteCookie } from 'hono/cookie';
 import { loginSchema, signupSchema, slugify } from '@bushi/domain';
-import { passwordResetEmail, welcomeEmail } from '@bushi/notifications';
+import { passwordResetEmail, welcomeEmail, passwordChangedEmail } from '@bushi/notifications';
 import { Db, now, type UserRow } from '@bushi/db';
 import type { AppBindings } from '../types.js';
 import { generateToken, hashPassword, hashToken, timingSafeEqual, uuid, verifyPassword } from '../lib/crypto.js';
@@ -168,6 +168,20 @@ authRoutes.post('/password/reset', async (c) => {
     // Revoke existing sessions so a compromised session can't survive a reset.
     { sql: `UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`, params: [now(), row.user_id] },
   ]);
+
+  // Notify the account that its password changed (best-effort).
+  const [u, p] = await Promise.all([
+    db.first<{ email: string }>(`SELECT email FROM users WHERE id = ?`, row.user_id),
+    db.first<{ full_name: string }>(`SELECT full_name FROM user_profiles WHERE user_id = ?`, row.user_id),
+  ]);
+  if (u?.email) {
+    const mail = passwordChangedEmail({ name: p?.full_name ?? 'there', supportUrl: `${c.env.APP_BASE_URL}` });
+    try {
+      await c.env.JOBS?.send({ kind: 'send_email', to: u.email, subject: mail.subject, html: mail.html, text: mail.text });
+    } catch {
+      /* queue not bound in dev */
+    }
+  }
   return c.json({ ok: true });
 });
 
