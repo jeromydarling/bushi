@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { setCookie, deleteCookie } from 'hono/cookie';
 import { loginSchema, signupSchema, slugify } from '@bushi/domain';
-import { passwordResetEmail } from '@bushi/notifications';
+import { passwordResetEmail, welcomeEmail } from '@bushi/notifications';
 import { Db, now, type UserRow } from '@bushi/db';
 import type { AppBindings } from '../types.js';
 import { generateToken, hashPassword, hashToken, timingSafeEqual, uuid, verifyPassword } from '../lib/crypto.js';
@@ -58,6 +58,15 @@ authRoutes.post('/signup', async (c) => {
 
   const token = await createSession(db, userId, c.req.header('User-Agent') ?? null);
   setSessionCookie(c, token);
+
+  // Welcome email (best-effort).
+  const welcome = welcomeEmail({ name: body.fullName, ctaUrl: `${c.env.APP_BASE_URL}/app` });
+  try {
+    await c.env.JOBS?.send({ kind: 'send_email', to: body.email, subject: welcome.subject, html: welcome.html, text: welcome.text });
+  } catch {
+    /* queue not bound in dev */
+  }
+
   return c.json({ user: { id: userId, email: body.email, fullName: body.fullName }, orgId }, 201);
 });
 

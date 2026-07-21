@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { registrationSchema } from '@bushi/domain';
+import { registrationConfirmationEmail } from '@bushi/notifications';
 import { Db, now } from '@bushi/db';
 import type { AppBindings } from '../types.js';
 import type { AuthContext } from '../env.js';
@@ -33,8 +34,17 @@ registrationRoutes.post('/', requireAuth, async (c) => {
   const ts = now();
 
   // Tournament must exist, be public, and still be open for registration.
-  const tournament = await db.first<{ id: string; is_public: number; status: string }>(
-    `SELECT id, is_public, status FROM tournaments WHERE id = ? AND deleted_at IS NULL`,
+  const tournament = await db.first<{
+    id: string;
+    is_public: number;
+    status: string;
+    name: string;
+    slug: string;
+    start_date: string;
+    city: string | null;
+    region: string | null;
+  }>(
+    `SELECT id, is_public, status, name, slug, start_date, city, region FROM tournaments WHERE id = ? AND deleted_at IS NULL`,
     body.tournamentId,
   );
   if (!tournament) throw new HttpError(404, 'Tournament not found');
@@ -42,8 +52,8 @@ registrationRoutes.post('/', requireAuth, async (c) => {
   if (!tournament.is_public || closed) throw new HttpError(400, 'Registration is not open for this tournament');
 
   // The athlete must belong to a school the caller manages.
-  const athlete = await db.first<{ id: string; school_id: string | null }>(
-    `SELECT id, school_id FROM athletes WHERE id = ? AND deleted_at IS NULL`,
+  const athlete = await db.first<{ id: string; school_id: string | null; first_name: string; last_name: string }>(
+    `SELECT id, school_id, first_name, last_name FROM athletes WHERE id = ? AND deleted_at IS NULL`,
     body.athleteId,
   );
   if (!athlete) throw new HttpError(404, 'Athlete not found');
@@ -51,15 +61,17 @@ registrationRoutes.post('/', requireAuth, async (c) => {
 
   // Enforce division caps / waitlist — and that each division belongs to this tournament.
   let waitlisted = false;
+  const divisionNames: string[] = [];
   for (const divisionId of body.divisionIds) {
-    const division = await db.first<{ cap: number | null; tournament_id: string }>(
-      `SELECT cap, tournament_id FROM divisions WHERE id = ?`,
+    const division = await db.first<{ cap: number | null; tournament_id: string; name: string }>(
+      `SELECT cap, tournament_id, name FROM divisions WHERE id = ?`,
       divisionId,
     );
     if (!division) throw new HttpError(404, `Division ${divisionId} not found`);
     if (division.tournament_id !== body.tournamentId) {
       throw new HttpError(400, 'Division does not belong to this tournament');
     }
+    divisionNames.push(division.name);
     if (division.cap != null) {
       const count = await db.first<{ n: number }>(
         `SELECT COUNT(*) AS n FROM division_entries WHERE division_id = ? AND status != 'withdrawn'`,
@@ -95,6 +107,21 @@ registrationRoutes.post('/', requireAuth, async (c) => {
     });
   }
   await db.batch(statements);
+
+  // Registration confirmation email to the registering user (best-effort).
+  const confirm = registrationConfirmationEmail({
+    athleteName: `${athlete.first_name} ${athlete.last_name}`,
+    tournamentName: tournament.name,
+    division: divisionNames.join(', ') || '—',
+    date: tournament.start_date,
+    location: [tournament.city, tournament.region].filter(Boolean).join(', '),
+    detailsUrl: `${c.env.APP_BASE_URL}/t/${tournament.slug}`,
+  });
+  try {
+    await c.env.JOBS?.send({ kind: 'send_email', to: auth.email, subject: confirm.subject, html: confirm.html, text: confirm.text });
+  } catch {
+    /* queue not bound in dev */
+  }
 
   return c.json({ registrationId, status: waitlisted ? 'waitlisted' : 'awaiting_payment', amountCents: amount }, 201);
 });
