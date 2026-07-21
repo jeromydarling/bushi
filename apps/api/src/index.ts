@@ -20,6 +20,7 @@ import { adminRoutes } from './routes/admin.js';
 import { crmRoutes } from './routes/crm.js';
 import { mediaRoutes } from './routes/media.js';
 import { inviteRoutes } from './routes/invites.js';
+import { seoRoutes } from './routes/seo.js';
 import { recomputeAllHealth } from './lib/health.js';
 import { getMailer } from './lib/mailer.js';
 import { tournamentReminderEmail, postEventRecapEmail } from '@bushi/notifications';
@@ -59,6 +60,7 @@ app.route('/api/admin', adminRoutes);
 app.route('/api/admin/crm', crmRoutes);
 app.route('/api/invites', inviteRoutes);
 app.route('/media', mediaRoutes);
+app.route('/', seoRoutes);
 
 app.onError((err, c) => {
   if (err instanceof HttpError) {

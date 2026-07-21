@@ -85,6 +85,7 @@ export function Discover() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            aria-label="Search tournaments by name or city"
             placeholder="Search by name or city…"
             className="w-full rounded-lg border border-ink-700 bg-ink-900 px-4 py-3 text-sm text-white not-dark:border-ink-200 not-dark:bg-white not-dark:text-ink-900"
           />

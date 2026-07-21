@@ -61,6 +61,7 @@ export function Customers() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          aria-label="Search customers"
           placeholder="Search customers…"
           className="w-full rounded-lg border border-ink-700 bg-ink-900 px-4 py-2.5 text-sm text-white not-dark:border-ink-200 not-dark:bg-white not-dark:text-ink-900"
         />

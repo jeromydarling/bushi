@@ -124,6 +124,7 @@ jobs:
           VITE_HERO_VIDEO_URL: ${{ vars.VITE_HERO_VIDEO_URL }}
           VITE_HERO_VIDEO_POSTER: ${{ vars.VITE_HERO_VIDEO_POSTER }}
           VITE_MAPBOX_TOKEN: ${{ vars.VITE_MAPBOX_TOKEN }}
+          VITE_OG_IMAGE: ${{ vars.VITE_OG_IMAGE }}
 
       - name: Ensure Pages project exists
         working-directory: apps/api

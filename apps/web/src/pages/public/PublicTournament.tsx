@@ -6,7 +6,7 @@ import { StatusBadge } from '../app/Dashboard.js';
 import { NotFound } from '../NotFound.js';
 import { findTournament } from '../../lib/demo.js';
 import { api, API_CONFIGURED } from '../../lib/api.js';
-import { useSeo } from '../../lib/seo.js';
+import { useSeo, useJsonLd } from '../../lib/seo.js';
 
 interface TournamentVM {
   name: string;
@@ -86,6 +86,25 @@ export function PublicTournament() {
   useSeo(
     t ? `${t.name} — Live results & registration` : 'Tournament — Bushi',
     t ? `Follow ${t.name} in ${t.city}, ${t.region}. Live brackets, results, and registration on Bushi.` : undefined,
+  );
+  useJsonLd(
+    'tournament',
+    t
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'SportsEvent',
+          name: t.name,
+          sport: 'Martial Arts',
+          startDate: t.startDate,
+          eventStatus: 'https://schema.org/EventScheduled',
+          location: {
+            '@type': 'Place',
+            name: t.venue || [t.city, t.region].filter(Boolean).join(', '),
+            address: [t.city, t.region].filter(Boolean).join(', '),
+          },
+          url: typeof location !== 'undefined' ? location.href : undefined,
+        }
+      : null,
   );
 
   if (state === 'loading') {

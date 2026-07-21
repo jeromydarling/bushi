@@ -1,6 +1,10 @@
 import { useEffect } from 'react';
 
-function upsertMeta(selector: string, attr: 'name' | 'property', key: string, content: string): void {
+const SITE_NAME = 'Bushi';
+const DEFAULT_OG_IMAGE = (import.meta.env.VITE_OG_IMAGE as string | undefined) ?? '';
+
+function upsertMeta(attr: 'name' | 'property', key: string, content: string): void {
+  const selector = `meta[${attr}="${key}"]`;
   let tag = document.head.querySelector(selector);
   if (!tag) {
     tag = document.createElement('meta');
@@ -20,26 +24,67 @@ function upsertCanonical(href: string): void {
   link.setAttribute('href', href);
 }
 
+/** Clamp a description to a search-friendly length (~160 chars). */
+function clampDescription(d: string): string {
+  return d.length <= 160 ? d : `${d.slice(0, 157).trimEnd()}…`;
+}
+
 /**
- * SEO helper — sets document title, meta description, Open Graph / Twitter tags,
- * and a canonical URL per page. Client-side (SPA), so crawlers that execute JS
- * pick it up; a prerender/SSR pass would be the next step for the rest.
+ * Per-page SEO — title, meta description, Open Graph / Twitter tags (with a
+ * page-specific or default social image), and a canonical URL. Client-rendered
+ * (SPA); a prerender pass would extend this to non-JS crawlers.
  */
-export function useSeo(title: string, description?: string): void {
+export function useSeo(title: string, description?: string, image?: string): void {
   useEffect(() => {
     const fullTitle = title.includes('Bushi') ? title : `${title} · Bushi 武士`;
     document.title = fullTitle;
-    upsertMeta('meta[property="og:title"]', 'property', 'og:title', fullTitle);
-    upsertMeta('meta[name="twitter:title"]', 'name', 'twitter:title', fullTitle);
-    upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
+    upsertMeta('property', 'og:title', fullTitle);
+    upsertMeta('property', 'og:type', 'website');
+    upsertMeta('property', 'og:site_name', SITE_NAME);
+    upsertMeta('name', 'twitter:title', fullTitle);
+    upsertMeta('name', 'twitter:card', 'summary_large_image');
+
     if (description) {
-      upsertMeta('meta[name="description"]', 'name', 'description', description);
-      upsertMeta('meta[property="og:description"]', 'property', 'og:description', description);
-      upsertMeta('meta[name="twitter:description"]', 'name', 'twitter:description', description);
+      const clamped = clampDescription(description);
+      upsertMeta('name', 'description', clamped);
+      upsertMeta('property', 'og:description', clamped);
+      upsertMeta('name', 'twitter:description', clamped);
     }
+
+    const og = image ?? DEFAULT_OG_IMAGE;
+    if (og) {
+      const abs = og.startsWith('http') ? og : `${location.origin}${og}`;
+      upsertMeta('property', 'og:image', abs);
+      upsertMeta('name', 'twitter:image', abs);
+    }
+
     if (typeof location !== 'undefined') {
-      upsertMeta('meta[property="og:url"]', 'property', 'og:url', location.href);
+      upsertMeta('property', 'og:url', location.href);
       upsertCanonical(location.origin + location.pathname);
     }
-  }, [title, description]);
+  }, [title, description, image]);
+}
+
+/**
+ * Inject a JSON-LD structured-data block (schema.org). Pass a plain object; it's
+ * serialized into a <script type="application/ld+json"> keyed by `id` so pages
+ * can replace their own block on navigation.
+ */
+export function useJsonLd(id: string, data: Record<string, unknown> | null): void {
+  useEffect(() => {
+    const elId = `jsonld-${id}`;
+    const existing = document.getElementById(elId);
+    if (!data) {
+      existing?.remove();
+      return;
+    }
+    const script = existing ?? document.createElement('script');
+    script.id = elId;
+    script.setAttribute('type', 'application/ld+json');
+    script.textContent = JSON.stringify(data);
+    if (!existing) document.head.appendChild(script);
+    return () => {
+      document.getElementById(elId)?.remove();
+    };
+  }, [id, data]);
 }

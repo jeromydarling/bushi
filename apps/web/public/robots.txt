@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /admin
+
+# The authoritative robots.txt + dynamic sitemap are served by the Worker
+# (/robots.txt, /sitemap.xml) on the production domain — see docs/seo.md.
+# On the primary domain, submit https://YOUR_DOMAIN/sitemap.xml to Search Console.

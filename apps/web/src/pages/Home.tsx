@@ -2,13 +2,31 @@ import { STYLE_LABELS, MARTIAL_ARTS_STYLES } from '@bushi/domain';
 import { HeroArt } from '../components/HeroArt.js';
 import { SizzleReel } from '../components/SizzleReel.js';
 import { Badge, Button, Card, Container, Eyebrow, Section, Stat } from '../components/ui.js';
-import { useSeo } from '../lib/seo.js';
+import { useSeo, useJsonLd } from '../lib/seo.js';
 
 export function Home() {
   useSeo(
-    'Bushi 武士 — The operating system for martial arts tournaments',
-    'Run tournaments across every martial art with live scoring, registration, marketing automation, and a free spectator experience. Cloudflare-native and fast.',
+    'Bushi 武士 — The OS for martial arts tournaments',
+    'Run tournaments across every martial art with live scoring, registration, brackets, and a free spectator experience. Cloudflare-native and fast.',
   );
+  useJsonLd('org', {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Bushi',
+    description: 'The operating system for martial arts tournaments.',
+    url: typeof location !== 'undefined' ? location.origin : undefined,
+  });
+  useJsonLd('website', {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Bushi',
+    url: typeof location !== 'undefined' ? location.origin : undefined,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${typeof location !== 'undefined' ? location.origin : ''}/discover?q={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  });
   return (
     <>
       {/* Hero */}

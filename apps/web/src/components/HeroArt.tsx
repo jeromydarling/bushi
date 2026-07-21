@@ -7,7 +7,7 @@ export function HeroArt() {
   return (
     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-ink-800/80 bg-ink-900/70 not-dark:border-ink-200 not-dark:bg-white">
       <div className="absolute inset-0 grid-lines opacity-70" />
-      <svg viewBox="0 0 400 300" className="relative h-full w-full" fill="none">
+      <svg viewBox="0 0 400 300" className="relative h-full w-full" fill="none" aria-hidden="true">
         {/* bracket lines */}
         <g stroke="currentColor" className="text-ink-700 not-dark:text-ink-300" strokeWidth="1.5">
           <path d="M40 50 H120 V95 H180" />
