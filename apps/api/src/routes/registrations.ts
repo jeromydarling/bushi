@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { registrationSchema } from '@bushi/domain';
-import { registrationConfirmationEmail } from '@bushi/notifications';
+import { registrationConfirmationEmail, waitlistPromotedEmail } from '@bushi/notifications';
 import { Db, now } from '@bushi/db';
 import type { AppBindings } from '../types.js';
 import type { AuthContext } from '../env.js';
@@ -85,9 +85,9 @@ registrationRoutes.post('/', requireAuth, async (c) => {
   const amount = body.divisionIds.length * ENTRY_FEE_CENTS;
   const statements = [
     {
-      sql: `INSERT INTO registrations (id,tournament_id,athlete_id,status,amount_cents,currency,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?)`,
-      params: [registrationId, body.tournamentId, body.athleteId, waitlisted ? 'waitlisted' : 'awaiting_payment', amount, 'usd', ts, ts],
+      sql: `INSERT INTO registrations (id,tournament_id,athlete_id,registered_by,status,amount_cents,currency,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?)`,
+      params: [registrationId, body.tournamentId, body.athleteId, auth.userId, waitlisted ? 'waitlisted' : 'awaiting_payment', amount, 'usd', ts, ts],
     },
     {
       sql: `INSERT INTO waiver_acceptances (id,tournament_id,athlete_id,registration_id,created_at) VALUES (?,?,?,?,?)`,
@@ -124,6 +124,46 @@ registrationRoutes.post('/', requireAuth, async (c) => {
   }
 
   return c.json({ registrationId, status: waitlisted ? 'waitlisted' : 'awaiting_payment', amountCents: amount }, 201);
+});
+
+// Promote a waitlisted registration — organizer action; notifies the registrant.
+registrationRoutes.post('/:id/promote', requireAuth, async (c) => {
+  const auth = c.get('auth')!;
+  const db = new Db(c.env.DB);
+  const reg = await db.first<{ id: string; tournament_id: string; status: string; athlete_id: string; registered_by: string | null }>(
+    `SELECT id, tournament_id, status, athlete_id, registered_by FROM registrations WHERE id = ?`,
+    c.req.param('id'),
+  );
+  if (!reg) throw new HttpError(404, 'Registration not found');
+  const tournament = await db.first<{ org_id: string; name: string; slug: string }>(
+    `SELECT org_id, name, slug FROM tournaments WHERE id = ? AND deleted_at IS NULL`,
+    reg.tournament_id,
+  );
+  if (!tournament) throw new HttpError(404, 'Tournament not found');
+  assertOrgAccess(auth, tournament.org_id, 'owner', 'organizer');
+  if (reg.status !== 'waitlisted') throw new HttpError(400, 'Only waitlisted registrations can be promoted');
+
+  await db.run(`UPDATE registrations SET status = 'awaiting_payment', updated_at = ? WHERE id = ?`, now(), reg.id);
+
+  if (reg.registered_by) {
+    const [u, athlete] = await Promise.all([
+      db.first<{ email: string }>(`SELECT email FROM users WHERE id = ?`, reg.registered_by),
+      db.first<{ first_name: string; last_name: string }>(`SELECT first_name, last_name FROM athletes WHERE id = ?`, reg.athlete_id),
+    ]);
+    if (u?.email) {
+      const mail = waitlistPromotedEmail({
+        athleteName: athlete ? `${athlete.first_name} ${athlete.last_name}` : 'Your athlete',
+        tournamentName: tournament.name,
+        detailsUrl: `${c.env.APP_BASE_URL}/t/${tournament.slug}`,
+      });
+      try {
+        await c.env.JOBS?.send({ kind: 'send_email', to: u.email, subject: mail.subject, html: mail.html, text: mail.text });
+      } catch {
+        /* queue not bound in dev */
+      }
+    }
+  }
+  return c.json({ ok: true, status: 'awaiting_payment' });
 });
 
 // Registrant roster (PII) — restricted to organizers of the tournament's org.

@@ -22,6 +22,7 @@ import { mediaRoutes } from './routes/media.js';
 import { inviteRoutes } from './routes/invites.js';
 import { recomputeAllHealth } from './lib/health.js';
 import { getMailer } from './lib/mailer.js';
+import { tournamentReminderEmail, postEventRecapEmail } from '@bushi/notifications';
 
 export { MatRoom } from './do/MatRoom.js';
 
@@ -79,6 +80,8 @@ export default {
         ingestAll(env).then((r) => console.log('Discovery run:', r)),
         recomputeAllHealth(env).then((r) => console.log('Health recompute:', r)),
         pruneExpired(env),
+        sendTournamentReminders(env),
+        sendPostEventRecaps(env),
       ]).then((results) => {
         for (const r of results) if (r.status === 'rejected') console.error('Scheduled task failed:', r.reason);
       }),
@@ -99,6 +102,74 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env, JobMessage>;
+
+const DAY_MS = 86_400_000;
+
+/** Distinct registrant emails for a tournament (people who registered someone). */
+async function registrantEmails(db: Db, tournamentId: string): Promise<string[]> {
+  const rows = await db.all<{ email: string }>(
+    `SELECT DISTINCT u.email FROM registrations r JOIN users u ON u.id = r.registered_by
+     WHERE r.tournament_id = ? AND r.registered_by IS NOT NULL AND r.status != 'withdrawn'`,
+    tournamentId,
+  );
+  return rows.map((r) => r.email).filter(Boolean);
+}
+
+/** Email registrants a reminder for tournaments starting in the next ~3 days (once). */
+async function sendTournamentReminders(env: Env): Promise<void> {
+  const db = new Db(env.DB);
+  const today = new Date(Date.now()).toISOString().slice(0, 10);
+  const in3 = new Date(Date.now() + 3 * DAY_MS).toISOString().slice(0, 10);
+  const rows = await db.all<{ id: string; name: string; slug: string; start_date: string; city: string | null; region: string | null }>(
+    `SELECT id,name,slug,start_date,city,region FROM tournaments
+     WHERE is_public = 1 AND deleted_at IS NULL AND status NOT IN ('completed','cancelled','archived','draft')
+       AND start_date >= ? AND start_date <= ?`,
+    today,
+    in3,
+  );
+  for (const t of rows) {
+    const flag = `reminded:${t.id}`;
+    if (await env.CACHE.get(flag)) continue;
+    const mail = tournamentReminderEmail({
+      tournamentName: t.name,
+      date: t.start_date,
+      location: [t.city, t.region].filter(Boolean).join(', '),
+      checkInTime: '9:00 AM',
+      detailsUrl: `${env.APP_BASE_URL}/t/${t.slug}`,
+    });
+    for (const email of await registrantEmails(db, t.id)) {
+      try {
+        await env.JOBS.send({ kind: 'send_email', to: email, subject: mail.subject, html: mail.html, text: mail.text });
+      } catch { /* queue unavailable */ }
+    }
+    await env.CACHE.put(flag, '1', { expirationTtl: 14 * 24 * 3600 });
+  }
+}
+
+/** Email registrants a recap for recently-completed tournaments (once). */
+async function sendPostEventRecaps(env: Env): Promise<void> {
+  const db = new Db(env.DB);
+  const since = new Date(Date.now() - 30 * DAY_MS).toISOString().slice(0, 10);
+  const rows = await db.all<{ id: string; name: string; slug: string }>(
+    `SELECT id,name,slug FROM tournaments WHERE status = 'completed' AND deleted_at IS NULL AND start_date >= ?`,
+    since,
+  );
+  for (const t of rows) {
+    const flag = `recapped:${t.id}`;
+    if (await env.CACHE.get(flag)) continue;
+    const mail = postEventRecapEmail({
+      tournamentName: t.name,
+      recapBody: `Thanks for competing at ${t.name}. Full brackets and final results are live.`,
+      recapUrl: `${env.APP_BASE_URL}/t/${t.slug}/results`,
+    });
+    for (const email of await registrantEmails(db, t.id)) {
+      try {
+        await env.JOBS.send({ kind: 'send_email', to: email, subject: mail.subject, html: mail.html, text: mail.text });
+      } catch { /* queue unavailable */ }
+    }
+    await env.CACHE.put(flag, '1', { expirationTtl: 60 * 24 * 3600 });
+  }
+}
 
 /** Housekeeping: drop expired/revoked sessions and spent reset tokens. */
 async function pruneExpired(env: Env): Promise<void> {

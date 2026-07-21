@@ -135,6 +135,23 @@ ${button('Accept invitation', v.acceptUrl)}`,
   return { subject, html, text };
 }
 
+export interface WaitlistPromotedVars {
+  athleteName: string;
+  tournamentName: string;
+  detailsUrl: string;
+}
+export function waitlistPromotedEmail(v: WaitlistPromotedVars): RenderedEmail {
+  const subject = `A spot opened up: ${v.tournamentName}`;
+  const html = layout(
+    subject,
+    `<h1 style="font-size:22px;margin:0 0 16px;">You’re off the waitlist 🎉</h1>
+${para(`${v.athleteName} has moved off the waitlist for ${v.tournamentName}. Complete registration to secure the spot.`)}
+${button('Complete registration', v.detailsUrl)}`,
+  );
+  const text = `${v.athleteName} is off the waitlist for ${v.tournamentName}. Complete registration: ${v.detailsUrl}`;
+  return { subject, html, text };
+}
+
 export interface RegistrationConfirmationVars {
   athleteName: string;
   tournamentName: string;
