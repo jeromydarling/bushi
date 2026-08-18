@@ -70,7 +70,24 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal server error' }, 500);
 });
 
-app.notFound((c) => c.json({ error: 'Not found' }, 404));
+// Anything the Worker doesn't handle is the SPA's territory. When the Worker is
+// mounted on the primary domain (bushi.pro/*), proxy unmatched GET/HEAD requests
+// to the Pages deployment so one domain serves app + API + SEO endpoints.
+// API/media misses and non-GET methods still return a JSON 404.
+app.notFound(async (c) => {
+  const path = new URL(c.req.url).pathname;
+  const isApiSurface = path.startsWith('/api') || path.startsWith('/media');
+  const method = c.req.method;
+  const pagesOrigin = c.env.PAGES_ORIGIN;
+  if (!isApiSurface && pagesOrigin && (method === 'GET' || method === 'HEAD')) {
+    const target = new URL(c.req.url);
+    const upstream = new URL(pagesOrigin);
+    target.protocol = upstream.protocol;
+    target.host = upstream.host;
+    return fetch(new Request(target.toString(), c.req.raw));
+  }
+  return c.json({ error: 'Not found' }, 404);
+});
 
 export default {
   fetch: app.fetch,

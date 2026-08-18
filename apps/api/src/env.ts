@@ -40,6 +40,12 @@ export interface Env {
   AI_GATEWAY_ID: string;
   AI_GATEWAY_ACCOUNT_ID?: string;
   APP_BASE_URL: string;
+  /**
+   * Origin of the static SPA deployment (Cloudflare Pages). When the Worker is
+   * mounted on the primary domain (e.g. bushi.pro/*), any request it doesn't
+   * handle itself is proxied here so the domain serves the app too.
+   */
+  PAGES_ORIGIN?: string;
   // Discovery tuning (all optional; sensible defaults in code).
   DISCOVERY_REGIONS?: string;
   DISCOVERY_STYLES?: string;

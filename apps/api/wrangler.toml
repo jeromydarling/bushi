@@ -101,6 +101,10 @@ crons = ["0 7 * * *"]
 [vars]
 ENVIRONMENT = "development"
 APP_BASE_URL = "http://localhost:5173"
+# Static SPA origin (Cloudflare Pages). When the Worker is mounted on the primary
+# domain (bushi.pro/*), unmatched GET/HEAD requests are proxied here so the domain
+# serves the app as well as the API.
+PAGES_ORIGIN = "https://bushi-web.pages.dev"
 
 # AI Gateway (optional) — set BOTH to route Perplexity through a gateway for
 # caching + a usage dashboard. Create one at Dashboard → AI → AI Gateway.
