@@ -7,16 +7,23 @@ name: Deploy to Cloudflare
 #                            D1:Edit, R2:Edit, Queues:Edit, Vectorize:Edit,
 #                            Pages:Edit, Workers AI:Read, Account Settings:Read.
 #   CLOUDFLARE_ACCOUNT_ID  — your Cloudflare account id.
+# Production architecture: the Worker fronts the primary domain (bushi.pro/*).
+# It serves /api, /media, robots.txt, sitemap.xml, llms.txt itself and proxies
+# every other GET/HEAD to the Pages deployment (PAGES_ORIGIN var in wrangler.toml),
+# so one origin serves app + API and auth stays same-origin.
+#
 # Optional repository variables (Settings → Secrets and variables → Actions → Variables):
-#   VITE_API_BASE          — the deployed Worker URL (e.g. https://bushi.<sub>.workers.dev),
-#                            baked into the web build so the SPA calls the live API.
+#   VITE_API_BASE          — the API origin baked into the web build. With the
+#                            front-door setup above, set it to the primary domain
+#                            (https://bushi.pro) so SPA→API calls stay same-origin.
 #   VITE_HERO_VIDEO_URL    — hero "blimp-cam" video URL (e.g. <worker>/media/hero/mat-blimp.mp4,
 #                            produced by the hero-video.yml workflow). Unset = no hero band.
 #   VITE_HERO_VIDEO_POSTER — poster still for the hero (reduced-motion fallback).
 #   VITE_MAPBOX_TOKEN      — Mapbox token for the super-admin CRM customer map.
-#   APP_BASE_URL           — the production site origin (e.g. https://bushi-web.pages.dev
-#                            or your custom domain). Injected as a Worker var so billing
-#                            success/cancel URLs and share links are correct in prod.
+#   VITE_OG_IMAGE          — absolute URL of the 1200×630 social share image.
+#   APP_BASE_URL           — the production site origin (https://bushi.pro). Injected
+#                            as a Worker var so billing success/cancel URLs, emailed
+#                            links, and the CORS allowlist are correct in prod.
 
 on:
   # Deploys always run from main. Use "Run workflow" (workflow_dispatch) to
