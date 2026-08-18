@@ -108,7 +108,9 @@ jobs:
       - name: Deploy Worker
         working-directory: apps/api
         env:
-          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+          # Config values resolve from Secrets first, then the Variables tab —
+          # so a freshly-set secret beats a stale variable of the same name.
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL || vars.APP_BASE_URL }}
         run: |
           args=(--var ENVIRONMENT:production)
           if [ -n "${APP_BASE_URL}" ]; then
@@ -119,7 +121,7 @@ jobs:
       # --- Build + deploy the web app to Cloudflare Pages ---
       - name: Require VITE_API_BASE
         run: |
-          if [ -z "${{ vars.VITE_API_BASE }}" ]; then
+          if [ -z "${{ secrets.VITE_API_BASE || vars.VITE_API_BASE }}" ]; then
             echo "::error::Repository variable VITE_API_BASE is required (Settings → Secrets and variables → Actions → Variables). Set it to your Worker URL (e.g. https://bushi.<sub>.workers.dev) so the SPA can reach the API."
             exit 1
           fi
@@ -127,11 +129,11 @@ jobs:
       - name: Build web
         run: pnpm --filter @bushi/web build
         env:
-          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
-          VITE_HERO_VIDEO_URL: ${{ vars.VITE_HERO_VIDEO_URL }}
-          VITE_HERO_VIDEO_POSTER: ${{ vars.VITE_HERO_VIDEO_POSTER }}
-          VITE_MAPBOX_TOKEN: ${{ vars.VITE_MAPBOX_TOKEN }}
-          VITE_OG_IMAGE: ${{ vars.VITE_OG_IMAGE }}
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE || vars.VITE_API_BASE }}
+          VITE_HERO_VIDEO_URL: ${{ secrets.VITE_HERO_VIDEO_URL || vars.VITE_HERO_VIDEO_URL }}
+          VITE_HERO_VIDEO_POSTER: ${{ secrets.VITE_HERO_VIDEO_POSTER || vars.VITE_HERO_VIDEO_POSTER }}
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN || vars.VITE_MAPBOX_TOKEN }}
+          VITE_OG_IMAGE: ${{ secrets.VITE_OG_IMAGE || vars.VITE_OG_IMAGE }}
 
       - name: Ensure Pages project exists
         working-directory: apps/api
