@@ -58,6 +58,9 @@ export interface Env {
   // Stripe Price IDs (price_...) per paid tier — set as vars/secrets for live billing.
   STRIPE_PRICE_STARTER?: string;
   STRIPE_PRICE_PRO?: string;
+  // Shared secret for the CROS hub's forwarded-Stripe-event envelope
+  // (POST /api/stripe/federation-in). Unset → the route fails closed.
+  FEDERATION_STRIPE_SECRET?: string;
   PERPLEXITY_API_KEY?: string;
   // One-time admin bootstrap token (see routes/admin bootstrap).
   ADMIN_BOOTSTRAP_TOKEN?: string;

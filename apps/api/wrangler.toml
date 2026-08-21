@@ -120,9 +120,12 @@ DISCOVERY_HORIZON_MONTHS = "3"
 
 # ---------------------------------------------------------------------------
 # Secrets (set via `wrangler secret put <NAME>`; never commit real values):
-#   SESSION_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, PERPLEXITY_API_KEY
+#   SESSION_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+#   FEDERATION_STRIPE_SECRET, PERPLEXITY_API_KEY
 # (Email uses the native send_email binding above — no API key needed.)
 # PERPLEXITY_API_KEY powers the discovery cron + on-demand web search.
+# FEDERATION_STRIPE_SECRET verifies the CROS hub's forwarded Stripe events
+# (POST /api/stripe/federation-in); the route fails closed while unset.
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

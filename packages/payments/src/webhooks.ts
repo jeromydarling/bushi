@@ -31,7 +31,8 @@ function parseSignatureHeader(header: string): ParsedSignatureHeader {
   return { timestamp, signatures };
 }
 
-async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+/** Lowercase-hex HMAC-SHA256 of `message` keyed by `secret` (WebCrypto). */
+export async function hmacSha256Hex(secret: string, message: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -47,7 +48,8 @@ async function hmacSha256Hex(secret: string, message: string): Promise<string> {
   return hex;
 }
 
-function timingSafeEqualHex(a: string, b: string): boolean {
+/** Constant-time (XOR-accumulate) comparison of two hex strings. */
+export function timingSafeEqualHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) {

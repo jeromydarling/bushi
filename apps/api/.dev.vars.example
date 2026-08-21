@@ -7,4 +7,8 @@ SESSION_SECRET="dev-only-change-me"
 STRIPE_SECRET_KEY=""
 STRIPE_WEBHOOK_SECRET=""
 
+# CROS hub federation — shared secret for forwarded Stripe events
+# (POST /api/stripe/federation-in). The route fails closed while unset.
+FEDERATION_STRIPE_SECRET=""
+
 # Email uses Cloudflare's native send_email binding — no API key required.

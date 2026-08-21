@@ -1,8 +1,15 @@
 import { Hono, type Context } from 'hono';
 import { SUBSCRIPTION_TIERS, type SubscriptionTier } from '@bushi/domain';
 import { Db, now, type SubscriptionRow } from '@bushi/db';
-import { StripeClient, PRICES, verifyWebhookSignature, parseWebhookEvent } from '@bushi/payments';
+import {
+  StripeClient,
+  PRICES,
+  verifyWebhookSignature,
+  parseWebhookEvent,
+  type StripeWebhookEvent,
+} from '@bushi/payments';
 import { billingNoticeEmail } from '@bushi/notifications';
+import type { Env } from '../env.js';
 import type { AppBindings } from '../types.js';
 import { HttpError } from '../lib/http.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -121,8 +128,21 @@ billingRoutes.post('/webhook', async (c) => {
   if (!valid) throw new HttpError(400, 'Invalid webhook signature');
 
   const event = parseWebhookEvent(payload);
+  await handleStripeEvent(event, c.env);
+  return c.json({ received: true });
+});
+
+/**
+ * Reconcile a verified Stripe event against our records. This is the single
+ * post-verification code path for Stripe events — called both by the direct
+ * webhook above (after Stripe-Signature verification) and by the CROS hub
+ * federation receiver (`POST /api/stripe/federation-in`, after HMAC envelope
+ * verification). Keep all event business logic here so the two paths cannot
+ * drift.
+ */
+export async function handleStripeEvent(event: StripeWebhookEvent, env: Env): Promise<void> {
   const obj = event.data.object;
-  const db = new Db(c.env.DB);
+  const db = new Db(env.DB);
 
   switch (event.type) {
     case 'checkout.session.completed': {
@@ -173,10 +193,10 @@ billingRoutes.post('/webhook', async (c) => {
           if (owner?.email) {
             const mail = billingNoticeEmail({
               status: status === 'canceled' ? 'canceled' : 'past_due',
-              manageUrl: `${c.env.APP_BASE_URL}/app`,
+              manageUrl: `${env.APP_BASE_URL}/app`,
             });
             try {
-              await c.env.JOBS?.send({ kind: 'send_email', to: owner.email, subject: mail.subject, html: mail.html, text: mail.text });
+              await env.JOBS?.send({ kind: 'send_email', to: owner.email, subject: mail.subject, html: mail.html, text: mail.text });
             } catch {
               /* queue not bound in dev */
             }
@@ -186,5 +206,4 @@ billingRoutes.post('/webhook', async (c) => {
       break;
     }
   }
-  return c.json({ received: true });
-});
+}
